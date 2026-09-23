@@ -41,9 +41,11 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 if (args.help || !args.from || !args.to || !args.fromDate || !args.toDate) {
-  console.log(`usage: node src/scan.mjs --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 --nights 4
+  console.log(`usage: ./scan.sh --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 --nights 4
        [--step 7] [--max 12] [--currency THB] [--prefs "no overnight layovers; carry-on only"]
-       [--concurrency 3] [--tolerance 1.4] [--threshold 0.5] [--no-rank] [--out FILE]`);
+       [--concurrency 3] [--tolerance 1.4] [--threshold 0.5] [--no-rank] [--out FILE]
+
+  (or: node src/scan.mjs … — ./scan.sh just finds node for you)`);
   process.exit(args.help ? 0 : 2);
 }
 

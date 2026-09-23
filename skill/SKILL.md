@@ -6,8 +6,10 @@ description: >-
   which ticket to book, checking whether a quoted price is good, and finding the cheapest travel
   dates across a season. Triggers include "find flights", "cheapest flight to X", "best ticket",
   "which date is cheapest", "is this a good price", and the Thai forms "หา flight", "หาตั๋วเครื่องบิน",
-  "ตั๋วไป", "ราคาตั๋ว", "ช่วงไหนถูก". Requires the flight-finder MCP server (tools: search_flights,
-  rank_flights, scan_dates).
+  "ตั๋วไป", "ราคาตั๋ว", "ช่วงไหนถูก". Works two ways: the flight-finder MCP tools (search_flights,
+  rank_flights, scan_dates) when the server is connected, otherwise the CLI in
+  ~/Sites/BareProj/flight-finder — see the CLI fallback section, and do not give up just because
+  the MCP tools are missing.
 ---
 
 # flight-finder
@@ -18,6 +20,24 @@ way to get a bad answer:
 
 - **Which flight should I book on this date?** → `rank_flights`
 - **When is it cheap?** → `scan_dates`
+
+## Two ways to reach it — try the tools, fall back to the CLI
+
+If the `flight-finder` MCP tools are available, use them. If they are **not** — this skill is
+shared across several agents and the MCP server is registered per agent, so it may well be
+missing — do not stop. The same logic runs from the repo:
+
+```bash
+cd ~/Sites/BareProj/flight-finder
+./find.sh CNX XIY 2026-12-11 4                                  # one date, judged
+./scan.sh --from CNX --to XIY --from-date 2026-11-01 \
+          --to-date 2027-02-28 --nights 4 --step 4              # a season, as a table
+```
+
+Both wrappers resolve `node` themselves, so they work even when the agent's PATH is minimal.
+Requires only Node 20+ and a `use-jev` install; no build step. The one real cost of the CLI
+route is that the itinerary list lands in your context, so Jev's saving is lost — the *judgment*
+is the same, only the token economics differ. See the CLI fallback section at the end for flags.
 
 ## The one rule that matters most: always state the trip length
 
@@ -170,11 +190,11 @@ cd ~/Sites/BareProj/flight-finder
 PREFS="no overnight layovers" ./find.sh CNX XIY 2026-12-11 4
 
 # the scan, as a table
-node src/scan.mjs --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
-                  --nights 4 --step 4 --max 32
-node src/scan.mjs --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
-                  --nights 4 --prefs "no overnight layovers; carry-on only"
+./scan.sh --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
+          --nights 4 --step 4 --max 32
+./scan.sh --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
+          --nights 4 --prefs "no overnight layovers; carry-on only"
 ```
 
-Both exit 3 when a verdict escalated, so they can be used in scripts. See `README.md` in that
-directory for the parser details.
+Both resolve `node` themselves and exit 3 when a verdict escalated, so they can be used in
+scripts. See `README.md` in that directory for the parser details.

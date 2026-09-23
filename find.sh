@@ -13,6 +13,9 @@
 # for a trip of its choosing, not yours.
 set -euo pipefail
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/lib/node-path.sh"
+
 FROM="${1:?usage: ./find.sh <ORIGIN> <DEST> <YYYY-MM-DD> [NIGHTS] [CURRENCY]}"
 TO="${2:?usage: ./find.sh <ORIGIN> <DEST> <YYYY-MM-DD> [NIGHTS] [CURRENCY]}"
 DATE="${3:?usage: ./find.sh <ORIGIN> <DEST> <YYYY-MM-DD> [NIGHTS] [CURRENCY]}"
@@ -21,7 +24,7 @@ CURRENCY="${5:-THB}"
 PREFS="${PREFS:-}"
 RETURN="${RETURN:-}"
 
-cd "$(dirname "$0")"
+cd "$HERE"
 SLUG="$(echo "${FROM}-${TO}" | tr 'A-Z' 'a-z')"
 if [ -n "$RETURN" ]; then
   OUT="out/${SLUG}-${DATE}-to-${RETURN}.json"
@@ -40,7 +43,7 @@ fi
 
 # macOS ships bash 3.2, where `set -u` plus an empty array is an "unbound variable"
 # error. The ${arr[@]+"${arr[@]}"} idiom is the portable way to expand a maybe-empty array.
-node src/scrape.mjs --from "$FROM" --to "$TO" --date "$DATE" --currency "$CURRENCY" \
+"$NODE" src/scrape.mjs --from "$FROM" --to "$TO" --date "$DATE" --currency "$CURRENCY" \
   ${DATE_ARG[@]+"${DATE_ARG[@]}"} --out "$OUT"
 echo
 
@@ -51,7 +54,7 @@ PREF_ARG=()
 # pick.mjs exits with Jev's own code: 0 = every verdict stands, 3 = something escalated.
 # Propagate it deliberately rather than letting `set -e` turn it into an accidental abort.
 set +e
-node src/pick.mjs --in "$OUT" ${PREF_ARG[@]+"${PREF_ARG[@]}"}
+"$NODE" src/pick.mjs --in "$OUT" ${PREF_ARG[@]+"${PREF_ARG[@]}"}
 code=$?
 set -e
 if [ "$code" -eq 3 ]; then
