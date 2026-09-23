@@ -11,6 +11,17 @@ Origin, destination, date, trip length and currency are all arguments — nothin
 hard-coded to a route. `CNX` / `NRT` in the examples are just placeholders. Nights comes
 before currency because you nearly always want it and rarely want the latter.
 
+Repository: <https://github.com/silkyland/flight-finder> (private)
+
+```bash
+git clone https://github.com/silkyland/flight-finder.git
+cd flight-finder && npm install
+```
+
+Needs Node 20+ and a `use-jev` install. There is also an MCP server (`mcp/server.mjs`) and
+a skill (`skill/SKILL.md`) — see the two sections further down.
+
+
 ## Trip length is not optional
 
 **Always pass the number of nights.** Without it Google silently invents a return date,
