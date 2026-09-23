@@ -79,6 +79,36 @@ documented way to avoid acting on nonsense.
 `worst_value` exists because a ranker that only ever returns the best option is hard to
 trust. Asking for the worst gives you something to check it against.
 
+## Traveller preferences
+
+Jev has no memory and no tools — it only knows what is written into the state. A preference
+that is not stated does not exist as far as the ranking is concerned, so they are a
+parameter:
+
+```bash
+node src/pick.mjs --in out/cnx-nrt.json --prefs "no low-cost carriers; at most one stop; 20kg bag included"
+node src/pick.mjs --in out/cnx-nrt.json --prefs-file prefs.txt
+PREFS="no red-eyes; depart after 10am" ./find.sh CNX NRT 2026-10-15
+```
+
+`prefs.example.txt` has a starter set. They are stated as hard constraints, and the
+questions tell Jev to honour them as such.
+
+The effect is not cosmetic. Same 11 itineraries, CNX→NRT 2026-10-15:
+
+| | no preferences | "full-service only, no arrival after 10 PM, at most one stop, 20kg bag" |
+|---|---|---|
+| `has_good_option` | 0.87 — a good option exists | **0.35 — nothing here is genuinely good** |
+| `best_overall` | f01, 89% | **f11 (THAI), 50%, escalated** |
+| price | THB 16,114 | THB 33,625 |
+
+Two things are worth noticing. The pick moves off the cheap low-cost option to the
+full-service one at double the fare — and it does so **unconfidently**, because THAI still
+arrives at 6:20 AM on a 55-minute connection, so the constraint set is not actually
+satisfiable on this date. The presence check is what surfaces that instead of letting the
+`choice` hand back a confident-looking winner. That drop from 0.87 to 0.35 is the whole
+reason `has_good_option` is in the batch.
+
 ## Reading the output
 
 ```
@@ -106,9 +136,13 @@ escalated, so you can branch on it in a script.
 - **Scraping a rendered Google page is inherently brittle.** The three signals above are
   stable and well-labelled, but Google can change markup at any time. If `count` drops to
   0, the HTML format moved — check `out/` and re-derive the regexes.
-- **Jev does not know the traveller.** It has no memory and no tools; everything it judges
-  is in the state. Add preferences (baggage, visa, airline blacklist, "I hate red-eyes") to
-  the `notes` array in `pick.mjs` and they will be honoured. They are not there yet.
+- **Jev does not know the traveller unless you tell it.** It has no memory and no tools;
+  everything it judges is in the state. Preferences go through `--prefs` / `--prefs-file`
+  (see above) — anything not stated there is simply not considered.
+- **Baggage, alliance and fare conditions are not in the scraped data.** Google Flights
+  exposes price, times, duration, stops, connection airports and CO2, and that is all. So
+  a preference like "20kg bag included" is honoured by inference from the airline, not from
+  the fare rules — check it on the booking page before you pay.
 - **Not a booking tool.** It ranks; it does not hold a fare.
 
 ## Requirements

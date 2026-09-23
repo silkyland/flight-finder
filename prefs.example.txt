@@ -1,0 +1,26 @@
+# Traveller preferences for flight-finder
+#
+# One per line. Blank lines and lines starting with # are ignored.
+# Use with:  node src/pick.mjs --in out/cnx-nrt.json --prefs-file prefs.txt
+#
+# Jev has no memory and no tools — it only knows what is written into the state, so a
+# preference that is not listed here does not exist as far as the ranking is concerned.
+# Treat these as hard constraints: if nothing in the list can satisfy them, the presence
+# check (has_good_option) is supposed to drop and say so rather than pick the least-bad
+# option silently.
+
+# --- carrier ---
+no low-cost carriers, full-service airline only
+prefer oneworld or Star Alliance if the price difference is under 10%
+
+# --- schedule ---
+departure no earlier than 10:00 AM
+must not arrive after 10:00 PM
+
+# --- connections ---
+at most one stop
+minimum 90 minute connection, I will not accept a tight transfer
+no layover longer than 6 hours
+
+# --- fare conditions ---
+20kg checked baggage included in the fare

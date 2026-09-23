@@ -39,6 +39,22 @@ if (!flights.length) {
   process.exit(1);
 }
 
+/**
+ * Traveller preferences. Jev has no memory and no tools — everything it judges is in the
+ * state, so anything the traveller cares about has to be stated here explicitly. Accepts
+ * --prefs "a; b; c" or --prefs-file prefs.txt (one per line, # comments allowed).
+ */
+const preferences = (() => {
+  if (args["prefs-file"]) {
+    return readFileSync(args["prefs-file"], "utf8")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter((s) => s && !s.startsWith("#"));
+  }
+  if (args.prefs) return args.prefs.split(";").map((s) => s.trim()).filter(Boolean);
+  return [];
+})();
+
 const hhmm = (min) => (min == null ? "?" : `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`);
 
 /** One human-readable line per itinerary, used both as the state and as choice criteria. */
@@ -66,10 +82,15 @@ const state = {
   depart_date: data.date,
   cheapest_price: cheapest,
   shortest_duration_min: fastest,
+  // Stated by the traveller. Treat these as hard constraints where they can be honoured
+  // and as strong preferences otherwise — they outrank the general comfort heuristic.
+  preferences: preferences.length
+    ? preferences
+    : ["none stated — judge on price, total time, stops, connection length and civilised hours alone"],
   notes: [
-    "Prices are round-trip totals in Thai baht, as quoted by Google Flights.",
+    `Prices are round-trip totals in ${data.currency}, as quoted by Google Flights.`,
     "All times are local. An arrival date later than the departure date means an overnight flight.",
-    "A layover is a connection on the same ticket; a long layover is time spent in an airport, not in Tokyo.",
+    "A layover is a connection on the same ticket; a long layover is time spent in an airport, not in the destination.",
     "CO2e is a per-passenger estimate and is a tie-breaker at most.",
   ],
   itineraries: flights.map((f) => ({ id: f.id, detail: describe(f) })),
@@ -77,42 +98,44 @@ const state = {
 
 const criteria = Object.fromEntries(flights.map((f) => [f.id, describe(f)]));
 
+const PREF = "Honour the traveller's `preferences` from the state: treat them as hard constraints wherever the options allow it, and as strong tie-breakers otherwise. If a preference cannot be satisfied by anything in the list, say so by choosing the option that violates it least.";
+
 const questions = {
   // The documented trap: a choice always ranks something first, so ask whether a good
   // option exists at all and read that verdict before trusting the pick.
   has_good_option: {
     type: "noul",
     instructions:
-      "Looking at the `itineraries` in the state, does at least one of them represent a genuinely good way to fly this route on this date — one a sensible traveller would be happy to book — rather than all of them being poor compromises?",
+      `Looking at the \`itineraries\` in the state, does at least one of them represent a genuinely good way to fly this route on this date for THIS traveller — one they would be happy to book — rather than all of them being poor compromises or violating their \`preferences\`?`,
   },
   best_overall: {
     type: "choice",
     instructions:
-      "Which single itinerary in `itineraries` is the best overall choice for this traveller, weighing total price against total door-to-door time, number of stops, how civilised the departure and arrival hours are, and the length of any layover?",
+      `Which single itinerary in \`itineraries\` is the best overall choice, weighing total price against total door-to-door time, number of stops, how civilised the departure and arrival hours are, and the length of any layover? ${PREF}`,
     criteria,
   },
   best_budget: {
     type: "choice",
     instructions:
-      "If this traveller's only real priority were paying the least money while still reaching Tokyo the same day or the next morning, which itinerary in `itineraries` should they book?",
+      `If paying the least money were the only real priority — while still reaching the destination the same day or the next morning, and still respecting any hard constraint in \`preferences\` — which itinerary in \`itineraries\` should be booked? ${PREF}`,
     criteria,
   },
   best_schedule: {
     type: "choice",
     instructions:
-      "If this traveller's only real priority were a comfortable schedule — a reasonable departure hour, an arrival that does not destroy the first day, and no punishing connection — which itinerary in `itineraries` should they book?",
+      `If a comfortable schedule were the only real priority — a reasonable departure hour, an arrival that does not destroy the first day, and no punishing connection — which itinerary in \`itineraries\` should be booked? ${PREF}`,
     criteria,
   },
   worst_value: {
     type: "choice",
     instructions:
-      "Which itinerary in `itineraries` looks like the worst value once you account for everything it costs in time and inconvenience, not just its price?",
+      `Which itinerary in \`itineraries\` looks like the worst value once you account for everything it costs in time and inconvenience, not just its price? ${PREF}`,
     criteria,
   },
   cheapest_value: {
     type: "score",
     instructions:
-      "Rate the overall value of the cheapest itinerary in `itineraries` — the one at `cheapest_price` — as a booking decision, all things considered.",
+      `Rate the overall value of the cheapest itinerary in \`itineraries\` — the one at \`cheapest_price\` — as a booking decision for this traveller, all things considered. ${PREF}`,
     criteria: [
       "You would regret booking this",
       "Acceptable only if nothing better exists",
@@ -182,6 +205,11 @@ const flightOf = (id) => flights.find((f) => f.id === id);
 
 console.log("");
 console.log(`Jev ${result.model} · ${flights.length} candidates · ${result.latencyMs} ms · state ${result.stateTokens} tokens`);
+if (preferences.length) {
+  console.log(`  preferences honoured: ${preferences.join(" · ")}`);
+} else {
+  console.log("  preferences: none stated — ranking on price, time, stops and hours alone");
+}
 console.log("");
 
 const gate = byId.has_good_option;
