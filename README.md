@@ -3,12 +3,52 @@
 Scrape Google Flights for a route, then let **Jev** pick the itinerary worth booking.
 
 ```
-./find.sh CNX NRT 2026-10-15
-./find.sh HKT SIN 2026-11-03 SGD
+./find.sh CNX NRT 2026-10-15 10        # 10 nights
+./find.sh HKT SIN 2026-11-03 4 SGD     # 4 nights, priced in SGD
 ```
 
-Origin, destination, date and currency are all arguments — nothing is hard-coded to a
-route. `CNX` / `NRT` in the examples are just placeholders.
+Origin, destination, date, trip length and currency are all arguments — nothing is
+hard-coded to a route. `CNX` / `NRT` in the examples are just placeholders. Nights comes
+before currency because you nearly always want it and rarely want the latter.
+
+## Trip length is not optional
+
+**Always pass the number of nights.** Without it Google silently invents a return date,
+and every price you get back is for a trip nobody chose. A bare
+`Flights from CNX to NRT on 2026-10-15` search comes back as a **15–19 Oct** round trip:
+4 nights, picked by Google.
+
+That is not a rounding error. Cheapest CNX→NRT round trip, departing 2026-10-15:
+
+| nights | return | cheapest | vs Google's default |
+|---|---|---|---|
+| 3 | 2026-10-18 | THB 16,114 | same |
+| **5** | **2026-10-20** | **THB 14,940** | **−7%** |
+| 7 | 2026-10-22 | THB 15,164 | −6% |
+| 10 | 2026-10-25 | THB 17,782 | **+10%** |
+| 14 | 2026-10-29 | THB 15,164 | −6% |
+
+A 19% spread between the cheapest and dearest trip length — and the length Google picks
+by default (4 nights) is not the cheap one. Ranking itineraries before fixing the trip
+length is ranking the wrong question.
+
+So the tool does two things about it:
+
+- `--days N` or `--return YYYY-MM-DD` (and `RETURN=` through `find.sh`) set it explicitly.
+- It **reads the dates back out of the page** afterwards and compares. `searchedDates` and
+  `searchedNights` in the JSON record what was actually searched; if that disagrees with
+  what you asked for, `scrape.mjs` and `pick.mjs` both say so out loud rather than
+  quietly reporting fares for the wrong trip:
+
+  ```
+  scrape: WARNING — no trip length given, so Google chose one:
+          2026-10-15 -> 2026-10-19 (4 nights). Every price below is for THAT trip.
+  ```
+
+The dates are read from two places on purpose: the visible inputs give a display string
+(`Thu, Oct 15`) and the "Track prices" aria-label carries unambiguous ISO dates
+(`departing 2026-10-15 and returning 2026-10-19`). Arithmetic uses the ISO pair, so a
+missing one yields `null` rather than a silently wrong number.
 
 ## Why Jev is in here at all
 
@@ -131,8 +171,12 @@ escalated, so you can branch on it in a script.
 
 ## Limits
 
-- **Prices are a snapshot** and move. Round-trip totals as Google quotes them, economy,
-  one adult; Google's default is a round trip, so a one-way search needs the URL changed.
+- **Prices are a snapshot** and move. They are round-trip totals for the trip length you
+  pass, economy, one adult. One-way is not implemented — Google defaults to a round trip,
+  and the query would need a different form.
+- **The trip length is a single number, not a date range.** Scanning several lengths or
+  several departure dates and comparing them is not implemented; run the tool per date and
+  compare, or ask for it.
 - **Scraping a rendered Google page is inherently brittle.** The three signals above are
   stable and well-labelled, but Google can change markup at any time. If `count` drops to
   0, the HTML format moved — check `out/` and re-derive the regexes.

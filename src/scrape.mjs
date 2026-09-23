@@ -46,9 +46,41 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(DATE)) {
   process.exit(2);
 }
 
-const url =
-  `${GOOGLE}?q=${encodeURIComponent(`Flights from ${FROM} to ${TO} on ${DATE}`)}` +
-  `&hl=en&curr=${CURRENCY}`;
+/**
+ * Return date. Without one, Google silently invents a trip length — a bare
+ * "on 2026-10-15" search came back as a 15-19 Oct round trip, and every price in it was
+ * for a 5-day trip nobody asked for. So: pass --return, or --days, and read the real
+ * dates back out of the page afterwards rather than assuming the query was honoured.
+ */
+const addDays = (iso, n) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+
+let RETURN = args.return || null;
+if (!RETURN && args.days) {
+  const n = Number(args.days);
+  if (!Number.isInteger(n) || n < 0 || n > 400) {
+    console.error("scrape: --days must be an integer between 0 and 400");
+    process.exit(2);
+  }
+  RETURN = addDays(DATE, n);
+}
+if (RETURN && !/^\d{4}-\d{2}-\d{2}$/.test(RETURN)) {
+  console.error("scrape: --return must be YYYY-MM-DD");
+  process.exit(2);
+}
+if (RETURN && RETURN < DATE) {
+  console.error(`scrape: --return ${RETURN} is before --date ${DATE}`);
+  process.exit(2);
+}
+
+const query = RETURN
+  ? `Flights from ${FROM} to ${TO} on ${DATE} returning ${RETURN}`
+  : `Flights from ${FROM} to ${TO} on ${DATE}`;
+
+const url = `${GOOGLE}?q=${encodeURIComponent(query)}&hl=en&curr=${CURRENCY}`;
 
 function decode(s) {
   return s
@@ -182,6 +214,58 @@ if (!res.ok) {
 }
 const html = await res.text();
 
+/**
+ * Read the dates Google actually searched back out of the page. Never assume the query
+ * was honoured — this is the check that catches Google substituting its own trip length.
+ *
+ * Two sources, deliberately: the visible inputs give a display string ("Thu, Oct 15") and
+ * the "Track prices" aria-label carries unambiguous ISO dates. Date arithmetic uses the
+ * ISO pair; the display pair is only for matching what a human sees.
+ */
+function fieldDates(page) {
+  const grab = (ph) => {
+    const m = page.match(new RegExp(`value="([^"]+)"\\s+placeholder="${ph}"`));
+    return m ? m[1] : null;
+  };
+  const iso = page.match(/departing (\d{4}-\d{2}-\d{2}) and returning (\d{4}-\d{2}-\d{2})/);
+  const departure = grab("Departure");
+  const ret = grab("Return");
+  return {
+    departure,
+    return: ret,
+    departureIso: iso ? iso[1] : null,
+    returnIso: iso ? iso[2] : null,
+  };
+}
+
+const actual = fieldDates(html);
+if (!actual.return) {
+  console.error(
+    "scrape: WARNING — the page shows no return date, so this is a ONE-WAY search. " +
+      "Prices below are one-way, not round trip.",
+  );
+} else if (!RETURN) {
+  // The trap: Google happily invents a trip length, and every price then describes a
+  // trip nobody chose. Say the length out loud instead of letting it pass silently.
+  const nights =
+    actual.departureIso && actual.returnIso
+      ? Math.round(
+          (new Date(`${actual.returnIso}T00:00:00Z`) - new Date(`${actual.departureIso}T00:00:00Z`)) / 864e5,
+        )
+      : null;
+  console.error(
+    `scrape: WARNING — no trip length given, so Google chose one: ` +
+      `${actual.departureIso ?? actual.departure} -> ${actual.returnIso ?? actual.return}` +
+      `${nights != null ? ` (${nights} nights)` : ""}. ` +
+      `Every price below is for THAT trip. Pass --days N or --return YYYY-MM-DD to control it.`,
+  );
+} else if (actual.returnIso && actual.returnIso !== RETURN) {
+  console.error(
+    `scrape: WARNING — asked to return ${RETURN} but the page searched ${actual.returnIso}. ` +
+      "Google overrode the return date; the prices are for its choice, not yours.",
+  );
+}
+
 // Google renders the itinerary list more than once (desktop + a hidden duplicate), so
 // the same flight shows up two or three times. Collapse on the fields that identify it.
 const sig = (f) =>
@@ -194,9 +278,19 @@ for (const f of splitCards(html).map(parseCard).filter(Boolean)) {
 }
 const flights = [...seen.values()].map((f, i) => ({ ...f, id: `f${String(i + 1).padStart(2, "0")}` }));
 
+const nightsBetween = (a, b) =>
+  a && b ? Math.round((new Date(`${b}T00:00:00Z`) - new Date(`${a}T00:00:00Z`)) / 864e5) : null;
+
 const payload = {
   route: `${FROM}-${TO}`,
+  // What was requested.
   date: DATE,
+  returnDate: RETURN,
+  nights: nightsBetween(DATE, RETURN),
+  // What the page actually searched, which is the only thing the prices describe.
+  // These two disagree whenever Google overrides the trip length.
+  searchedDates: actual,
+  searchedNights: nightsBetween(actual.departureIso, actual.returnIso),
   currency: CURRENCY,
   scrapedAt: new Date().toISOString(),
   source: url,
@@ -210,7 +304,10 @@ if (args.out) {
   const { dirname } = await import("node:path");
   mkdirSync(dirname(args.out), { recursive: true });
   writeFileSync(args.out, json);
-  console.error(`scrape: ${flights.length} itineraries -> ${args.out}`);
+  const trip = actual.return
+    ? `${actual.departure} -> ${actual.return}${payload.nights != null ? ` (${payload.nights} nights)` : ""}`
+    : `${actual.departure} (one way)`;
+  console.error(`scrape: ${flights.length} itineraries, ${trip} -> ${args.out}`);
 } else {
   process.stdout.write(json + "\n");
 }

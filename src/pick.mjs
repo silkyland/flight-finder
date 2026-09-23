@@ -73,13 +73,39 @@ const describe = (f) => {
 const cheapest = Math.min(...flights.map((f) => f.price));
 const fastest = Math.min(...flights.map((f) => f.durationMin ?? Infinity));
 
+// The trip the prices actually describe. Prefer the dates read back off the page: if
+// Google overrode the request, the request is not what the fares are for.
+const sIso = data.searchedDates?.departureIso ?? null;
+const sRet = data.searchedDates?.returnIso ?? null;
+const trip =
+  sRet && data.searchedNights != null
+    ? `${data.searchedNights} nights (${sIso} out, ${sRet} back)`
+    : data.returnDate && data.nights != null
+      ? `${data.nights} nights (${data.date} out, ${data.returnDate} back)`
+      : "one way";
+
+const mismatch =
+  data.returnDate && sRet && data.returnDate !== sRet
+    ? `requested return ${data.returnDate} but the page searched ${sRet}`
+    : !data.returnDate && sRet
+      ? `no trip length was requested — Google chose ${data.searchedNights} nights (${sIso} -> ${sRet})`
+      : null;
+
 const state = {
   task:
-    `Pick the single best round-trip itinerary from ${data.route} departing ${data.date}. ` +
-    `A solo leisure traveller, economy cabin, no loyalty programme, price paid in cash.`,
+    `Pick the single best ${data.returnDate ? "round-trip" : "one-way"} itinerary from ` +
+    `${data.route}, departing ${data.date}${data.returnDate ? ` and returning ${data.returnDate}` : ""} ` +
+    `— a trip of ${trip}. A solo leisure traveller, economy cabin, no loyalty programme, ` +
+    `price paid in cash.`,
   currency: data.currency,
   route: data.route,
   depart_date: data.date,
+  return_date: data.returnDate,
+  trip_length: trip,
+  // What Google actually searched. If this disagrees with the request, the prices
+  // describe a different trip than the one being planned.
+  searched_dates: data.searchedDates ?? null,
+  trip_length_verified: mismatch ? `NO — ${mismatch}` : "yes — the page searched the requested dates",
   cheapest_price: cheapest,
   shortest_duration_min: fastest,
   // Stated by the traveller. Treat these as hard constraints where they can be honoured
@@ -204,6 +230,11 @@ const pct = (p) => `${(p * 100).toFixed(1)}%`;
 const flightOf = (id) => flights.find((f) => f.id === id);
 
 console.log("");
+console.log(`  trip: ${data.route} · ${trip}`);
+if (mismatch) {
+  console.log(`  !! ${mismatch}`);
+  console.log(`     every price below is for that trip, not the one you asked for`);
+}
 console.log(`Jev ${result.model} · ${flights.length} candidates · ${result.latencyMs} ms · state ${result.stateTokens} tokens`);
 if (preferences.length) {
   console.log(`  preferences honoured: ${preferences.join(" · ")}`);
