@@ -1,0 +1,11 @@
+{
+  "name": "flight-finder",
+  "private": true,
+  "type": "module",
+  "description": "Scrape Google Flights and let Jev pick the best itinerary",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "scrape": "node src/scrape.mjs",
+    "pick": "node src/pick.mjs"
+  }
+}
