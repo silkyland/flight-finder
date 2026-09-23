@@ -117,9 +117,11 @@ then reports the date as **UNKNOWN** (`unknown: true`, listed in `unknown_dates`
 Never describe an UNKNOWN date as "no flights", "sold out", or "expensive". It is unknown. Say so
 and, if it matters, suggest checking that date in a browser.
 
-Coverage is genuinely patchy on some routes — a recent CNX→XIY scan returned data for 5 of 8
-sampled dates. Always report `coverage` alongside a scan so the caller knows how much of the
-range was actually priced.
+Coverage is genuinely patchy, and it is not uniform: a full CNX→XIY winter scan returned data
+for **18 of 30** sampled dates, but only **2 of 10** in February. Whole weeks can go missing, so
+never assume a gap in the table means the season is covered. Always report `coverage` alongside a
+scan, and if a specific period matters (Chinese New Year, school holidays), say plainly whether
+that period actually got sampled.
 
 ## What this cannot tell you
 
@@ -166,7 +168,13 @@ When the MCP server is not connected, the same logic runs from the repo:
 cd ~/Sites/BareProj/flight-finder
 ./find.sh CNX XIY 2026-12-11 4            # <ORIGIN> <DEST> <DATE> [NIGHTS] [CURRENCY]
 PREFS="no overnight layovers" ./find.sh CNX XIY 2026-12-11 4
+
+# the scan, as a table
+node src/scan.mjs --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
+                  --nights 4 --step 4 --max 32
+node src/scan.mjs --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
+                  --nights 4 --prefs "no overnight layovers; carry-on only"
 ```
 
-`find.sh` exits 3 when a verdict escalated, so it can be used in scripts. See `README.md` in that
-directory for the parser details and the multi-date scan module (`src/lib/scan.mjs`).
+Both exit 3 when a verdict escalated, so they can be used in scripts. See `README.md` in that
+directory for the parser details.
