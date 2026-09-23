@@ -65,13 +65,61 @@ travel through the context twice; this way it travels through zero times.
 ## Pipeline
 
 ```
-src/scrape.mjs   Google Flights HTML  ->  out/<route>-<date>.json
-src/pick.mjs     that JSON            ->  use-jev judge  ->  the pick
-find.sh          both, in order
+src/lib/flights.mjs   the whole implementation — parsing, state, questions, jev, summary
+src/lib/scan.mjs      multi-date pricing, and judging which DATE is worth booking
+
+src/scrape.mjs        CLI wrapper:  Google Flights HTML  ->  out/<route>-<date>.json
+src/pick.mjs          CLI wrapper:  that JSON  ->  use-jev judge  ->  the pick
+find.sh               both, in order
+
+mcp/server.mjs        the same implementation as an MCP server (3 tools)
+mcp/smoke.mjs         drives the server over stdio, for testing
 ```
+
+The CLI and the server share one module on purpose: a parser fix cannot land in one and
+miss the other.
 
 `out/questions.generated.json` and `out/state.generated.json` are written on every run so
 you can read exactly what was asked and exactly what Jev saw.
+
+## The MCP server
+
+Three tools, in increasing order of how much should never reach the model's context:
+
+| Tool | Question it answers | Context cost |
+| --- | --- | --- |
+| `search_flights` | What itineraries exist on this date? | the whole list |
+| `rank_flights` | Which one should I book? | the winner + 3 runners-up |
+| `scan_dates` | When is it cheap? | one row per date |
+
+`rank_flights` and `scan_dates` hand the candidate list to the Jev CLI **as a file**, so the
+itineraries never travel through the model's context. That is the entire saving — a caller
+that then pulls the list back in has thrown it away.
+
+```bash
+node mcp/smoke.mjs list                                  # the tool surface
+node mcp/smoke.mjs rank CNX XIY 2026-12-11 4             # one date, judged
+node mcp/smoke.mjs scan CNX XIY 2026-11-20 2027-01-29 4 7 8
+```
+
+Registered in `~/.workbuddy-ai/mcp.json`. It uses the low-level `Server` with raw JSON
+Schema rather than `McpServer.registerTool`, because the latter requires a zod schema and
+this way the only dependency stays the SDK itself.
+
+`scan_dates` **refuses to run** without a trip length. Comparing dates priced at different
+trip lengths is not slightly wrong, it is meaningless.
+
+### The no-JavaScript view is partial
+
+Google pre-renders the result list into the HTML only *sometimes*. When it does not, the
+page parses to zero itineraries even though the route is served — the date input is filled
+in, the route is correct, and there is simply no result markup. It retries three times; it
+is deterministic, not a race, and no URL variation fixes it (`curr`, `gl`, display-date
+phrasing and one-way all return the same nothing).
+
+So a zero is reported as **UNKNOWN**, never as "no flights". The two are different claims
+and conflating them is how you tell someone a route does not exist. Coverage is genuinely
+patchy: a CNX→XIY scan of 8 sampled dates returned data for 5.
 
 ### Scraping without a browser
 
@@ -96,6 +144,15 @@ Two things worth knowing if you edit the parser:
 - **A connection under an hour has no "hr" in it** — `is a 55 min layover at ...`. A regex
   that requires `(\d+) hr` silently drops it, which is how the THAI itinerary first came
   back with `stops=1` and no layover.
+
+## The skill
+
+`skill/SKILL.md`, symlinked into `~/.workbuddy-ai/skills/flight-finder` and
+`~/.agents/skills/flight-finder`, so it stays versioned with the code it describes. It
+carries the operational rules an agent needs and cannot infer: state the trip length, pass
+the traveller's own preferences verbatim, read the gate before the ranking, treat
+`escalate` as a prior, and never call an UNKNOWN date unavailable.
+
 
 ## The questions
 
