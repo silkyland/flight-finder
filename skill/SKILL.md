@@ -8,7 +8,7 @@ description: >-
   "which date is cheapest", "is this a good price", and the Thai forms "หา flight", "หาตั๋วเครื่องบิน",
   "ตั๋วไป", "ราคาตั๋ว", "ช่วงไหนถูก". Works two ways: the flight-finder MCP tools (search_flights,
   rank_flights, scan_dates) when the server is connected, otherwise the CLI in
-  ~/Sites/BareProj/flight-finder — see the CLI fallback section, and do not give up just because
+  ~/Sites/Onboards/flight-finder — see the CLI fallback section, and do not give up just because
   the MCP tools are missing.
 ---
 
@@ -28,7 +28,7 @@ shared across several agents and the MCP server is registered per agent, so it m
 missing — do not stop. The same logic runs from the repo:
 
 ```bash
-cd ~/Sites/BareProj/flight-finder
+cd ~/Sites/Onboards/flight-finder
 ./find.sh CNX XIY 2026-12-11 4                                  # one date, judged
 ./scan.sh --from CNX --to XIY --from-date 2026-11-01 \
           --to-date 2027-02-28 --nights 4 --step 4              # a season, as a table
@@ -185,7 +185,7 @@ not a single-date lookup. A price is only good or bad relative to the alternativ
 When the MCP server is not connected, the same logic runs from the repo:
 
 ```bash
-cd ~/Sites/BareProj/flight-finder
+cd ~/Sites/Onboards/flight-finder
 ./find.sh CNX XIY 2026-12-11 4            # <ORIGIN> <DEST> <DATE> [NIGHTS] [CURRENCY]
 PREFS="no overnight layovers" ./find.sh CNX XIY 2026-12-11 4
 
