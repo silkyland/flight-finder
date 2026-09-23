@@ -3,9 +3,14 @@
   "private": true,
   "type": "module",
   "description": "Scrape Google Flights and let Jev pick the best itinerary",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "scrape": "node src/scrape.mjs",
     "pick": "node src/pick.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
   }
 }
