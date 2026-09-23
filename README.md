@@ -153,6 +153,36 @@ carries the operational rules an agent needs and cannot infer: state the trip le
 the traveller's own preferences verbatim, read the gate before the ranking, treat
 `escalate` as a prior, and never call an UNKNOWN date unavailable.
 
+### Sharing it with other agents
+
+There are **two independent layers**, and conflating them is the usual mistake:
+
+| Layer | Where it lives | Reaches other agents |
+| --- | --- | --- |
+| Skill | `~/.agents/skills/flight-finder` → this repo | only via a **per-agent symlink** |
+| MCP server | one config file **per agent**, in that agent's own format | only via a per-agent entry |
+
+`~/.agents/skills/` is the shared library, but agents do not read it directly — each agent's
+skill directory holds an *individual* symlink per skill. So a new skill in `~/.agents/skills/`
+is invisible until you link it:
+
+```bash
+ln -s ~/.agents/skills/flight-finder ~/.claude/skills/flight-finder
+```
+
+Linked into: claude, cursor, codex, devin, qwen, opencode, windsurf.
+
+The MCP server is registered for **cursor** (`~/.cursor/mcp.json`), **codex**
+(`~/.codex/config.toml`) and **opencode** (`~/.config/opencode/opencode.json`). Each agent
+uses a different shape — opencode nests under `mcp` with `command` as an *array*, codex is
+TOML under `[mcp_servers.name]`, cursor and WorkBuddy use `mcpServers` with `command`/`args`.
+
+**The MCP is optional.** The skill's CLI route (`./find.sh`, `./scan.sh`) works in any agent
+that can run bash, with no MCP registration at all — but the itinerary list then lands in the
+agent's context, so Jev's token saving is lost. The judgment is identical; only the economics
+change. That is why the skill leads with both routes instead of requiring the server.
+
+
 
 ## The questions
 
