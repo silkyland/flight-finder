@@ -223,6 +223,30 @@ country costs extra.
 
 Price the hop separately and add it up, rather than reasoning about what it "should" cost.
 
+## A long layover is not automatically dead time
+
+Jev scores a 19-hour layover as time wasted, because that is what it is for a traveller who stays in
+the terminal. But a long layover at a hub is also a **stopover** — enough time to leave the airport,
+see the city, and sleep in a real bed. The tool cannot tell the difference, and it does not know
+whether the traveller can even enter the transit country.
+
+A real case: CNX → Istanbul on Etihad, THB 22,145, 31h40 total with **19h40 at Abu Dhabi**. Jev
+scored it 0.17/4 — "you would regret booking this". But the layover runs 13:05 → 08:45 the next
+morning, which is ~16 usable hours: an afternoon, an evening and a night. That is a city, not a
+delay. When a verdict punishes a long layover, check three things before repeating it:
+
+1. **Can the traveller leave the airport?** Not every nationality is visa-free, and a transit visa
+   usually has to be arranged with the airline *before* travel. If it is not approved, the layover
+   genuinely is dead time — and that is the whole risk of the ticket.
+2. **What are the clock times in the transit city?** A 19h40 layover spanning an afternoon and a
+   night is worth far more than one spanning 22:00–18:00. Work it out from the arrival time plus
+   the layover duration, and mind the time zones.
+3. **What does the stopover cost?** Visa + hotel + transfers can equal the entire fare saving. In
+   that case the honest framing is "you get the extra city at no net cost", not "you saved money".
+
+Report it as a choice, not as a verdict: the same ticket is bad for someone who will stay airside
+and good for someone who will not. Say which assumption the tool made.
+
 ## Worked examples
 
 **"Find me a good price CNX→XIY this winter, 5 days 4 nights"**
