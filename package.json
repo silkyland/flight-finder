@@ -1,6 +1,5 @@
 {
   "name": "flight-finder",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
   "description": "Scrape Google Flights without a browser, then let Jev judge the itineraries: which flight to book, which dates are cheapest, and which destination is worth the fare",
@@ -11,6 +10,24 @@
     "url": "git+https://github.com/silkyland/flight-finder.git"
   },
   "homepage": "https://github.com/silkyland/flight-finder",
+  "bin": {
+    "flight-finder-mcp": "mcp/server.mjs",
+    "flight-finder-scrape": "src/scrape.mjs",
+    "flight-finder-pick": "src/pick.mjs",
+    "flight-finder-scan": "src/scan.mjs",
+    "flight-finder-sweep": "src/sweep.mjs"
+  },
+  "files": [
+    "src/",
+    "mcp/server.mjs",
+    "lib/",
+    "skills/",
+    "find.sh",
+    "scan.sh",
+    "sweep.sh",
+    "prefs.example.txt",
+    "NOTICE"
+  ],
   "keywords": [
     "flights",
     "google-flights",
