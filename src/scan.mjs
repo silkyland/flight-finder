@@ -77,13 +77,13 @@ console.log(
 );
 if (args.prefs.length) console.log(`  preferences: ${args.prefs.join(" | ")}`);
 
-console.log(`\n  ${pad("depart", 12)} ${pad("return", 12)} ${pad("sweet", 9)} ${pad("cheapest", 9)} ${pad("fastest", 9)} n  itinerary`);
-console.log(`  ${"-".repeat(94)}`);
+console.log(`\n  ${pad("depart", 12)} ${pad("return", 12)} ${pad("sweet", 9)} ${pad("cheapest", 9)} ${pad("fastest", 12)} n  itinerary`);
+console.log(`  ${"-".repeat(110)}`);
 for (const r of sorted) {
   const s = r.sweet_spot;
   console.log(
     `  ${pad(r.date, 12)} ${pad(r.returnDate, 12)} ${pad(money(s?.price), 9)} ${pad(money(r.cheapest?.price), 9)} ` +
-      `${pad(r.fastest?.durationLabel ?? "—", 9)} ${pad(r.count, 2)} ${s ? `${s.airlines.join("+")} · ${s.durationLabel} · ${s.stops === 0 ? "nonstop" : `${s.stops} stop`}` : "—"}`,
+      `${pad(r.fastest?.durationLabel ?? "—", 12)} ${pad(r.count, 2)} ${s ? `${s.airlines.join("+")} · ${s.durationLabel} · ${s.stops === 0 ? "nonstop" : `${s.stops} stop`}` : "—"}`,
   );
 }
 

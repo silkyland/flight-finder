@@ -175,6 +175,7 @@ export async function scanDates({
       // A date Google gave us no result markup for is UNKNOWN, not empty. Keep the two apart
       // all the way to the report, or a missing render reads as "this date is unavailable".
       row.unknown = payload.count === 0 && !payload.pageHadResultMarkup;
+      if (payload.unpriced?.length) row.unpriced = payload.unpriced;
       if (w.length) row.warnings = w;
       return row;
     } catch (e) {
@@ -182,10 +183,19 @@ export async function scanDates({
     }
   });
 
-  // Surface each distinct upstream warning once, not once per date.
+  // Surface each distinct upstream warning once, not once per date. The "Price unavailable" one
+  // names different flights on every date, so it would never dedupe — fold it into one line.
   const seen = new Set();
+  const unpricedDates = rows.filter((r) => r.unpriced?.length);
+  if (unpricedDates.length) {
+    warnings.push(
+      `${unpricedDates.length} of ${rows.length} dates also listed itineraries as "Price unavailable" ` +
+        `(left out of the fares above): ${[...new Set(unpricedDates.flatMap((r) => r.unpriced))].slice(0, 6).join("; ")}.`,
+    );
+  }
   for (const r of rows) {
     for (const w of r.warnings ?? []) {
+      if (/Price unavailable/.test(w)) continue;
       if (!seen.has(w)) {
         seen.add(w);
         warnings.push(w);

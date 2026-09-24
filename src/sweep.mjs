@@ -101,15 +101,15 @@ if (args.prefs.length) console.log(`  preferences: ${args.prefs.join(" | ")}`);
 
 console.log(
   `\n  ${pad("dest", 5)} ${pad("city", 24)} ${pad("best date", 12)} ${pad("fare", 8)} ${pad("cheap", 8)} ` +
-    `${pad("fastest", 8)} n  itinerary`,
+    `${pad("fastest", 12)} n   itinerary`,
 );
-console.log(`  ${"-".repeat(116)}`);
+console.log(`  ${"-".repeat(124)}`);
 for (const r of sorted) {
   const f = r.best;
   console.log(
     `  ${pad(r.to, 5)} ${pad(`${r.city ?? ""}${r.country ? `, ${r.country}` : ""}`.slice(0, 23), 24)} ` +
       `${pad(r.best_date, 12)} ${pad(money(f.price), 8)} ${pad(money(r.cheapest?.price), 8)} ` +
-      `${pad(r.fastest?.durationLabel ?? "—", 8)} ${pad(r.itineraries, 3)} ` +
+      `${pad(r.fastest?.durationLabel ?? "—", 12)} ${pad(r.itineraries, 3)} ` +
       `${f.airlines.join("+")} · ${f.durationLabel} · ${f.stops === 0 ? "nonstop" : `${f.stops} stop`}` +
       `${f.layovers?.length ? ` (${f.layovers.map((l) => `${l.minutes}m ${l.airport}`).join(", ")})` : ""}`,
   );

@@ -79,11 +79,28 @@ const CURRENCY_CODES = {
   "uae dirhams": "AED",
 };
 
+const CARD_RE = /Leaves [^<]{40,700}?Select flight/;
+
 /** Split the page into one chunk per itinerary. */
 function splitCards(html) {
-  return html
-    .split(/(?=<li\b)/)
-    .filter((c) => PRICE_RE.test(c) && /Leaves [^<]{40,600}?Select flight/.test(c));
+  return html.split(/(?=<li\b)/).filter((c) => PRICE_RE.test(c) && CARD_RE.test(c));
+}
+
+/**
+ * Itineraries Google lists but will not price ("Price unavailable"). They cannot be ranked,
+ * but dropping them silently hides that the route has more service than the list shows —
+ * on BKK-MLE they were Singapore Airlines and China Eastern. Return a one-line label for each.
+ */
+function unpricedCards(html) {
+  const labels = new Set();
+  for (const c of html.split(/(?=<li\b)/)) {
+    if (PRICE_RE.test(c) || !CARD_RE.test(c) || !/Price unavailable/.test(c)) continue;
+    const air = c.match(/<div class="[^"]*"><span>([^<]+)<\/span>/);
+    const dep = c.match(/Leaves .*? at (\d{1,2}:\d{2}\s*[AP]M)/);
+    const dur = c.match(/Total duration ([^.]+)\./);
+    labels.add([air && decode(air[1]), dep && dep[1].replace(/\s+/g, " "), dur && dur[1]].filter(Boolean).join(" · "));
+  }
+  return [...labels];
 }
 
 function parseCard(chunk, from, to, fallbackCurrency) {
@@ -122,9 +139,18 @@ function parseCard(chunk, from, to, fallbackCurrency) {
     });
   }
 
-  // Airline names sit between the arrival date and the duration in the card text.
-  const airM = text.match(/on (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), [A-Z][a-z]{2} \d+ ([^0-9]+?) \d+ hr/);
-  const airlines = airM ? airM[1].split(/,\s*/).map((s) => s.trim()).filter(Boolean) : [];
+  // Airline names are the first <span> of the block after the arrival time. A codeshare card
+  // adds a second span after an empty-labelled separator ("THAI, SriLankan · EVA Air",
+  // "LATAM · Operated by Latam Airlines Peru") — a partner or operator note. Flattening the text
+  // merged it into the last carrier ("SriLankan EVA Air"), so keep it apart as `alsoListed`.
+  // Read the spans; fall back to the text pattern if the markup moves.
+  const airBlock = chunk.match(
+    /<div class="[^"]*"><span>([^<]+)<\/span>(?:<span [^>]*aria-label=" "[^>]*><\/span><span>([^<]+)<\/span>)?<\/div>/,
+  );
+  const airM = airBlock ? null : text.match(/on (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), [A-Z][a-z]{2} \d+ ([^0-9]+?) \d+ hr/);
+  const airText = airBlock ? decode(airBlock[1]) : airM?.[1] ?? "";
+  const airlines = airText.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
+  const alsoListed = airBlock?.[2] ? decode(airBlock[2]).split(/,\s*/).map((s) => s.trim()).filter(Boolean) : [];
 
   const stopsM = text.match(/(Nonstop|\d+ stops?)\b/);
   const stops = !stopsM ? null : /Nonstop/i.test(stopsM[1]) ? 0 : Number(stopsM[1].match(/\d+/)[0]);
@@ -139,6 +165,7 @@ function parseCard(chunk, from, to, fallbackCurrency) {
     priceLabel,
     tripType: tripM ? tripM[1].toLowerCase().replace("-", " ") : null,
     airlines,
+    ...(alsoListed.length ? { alsoListed } : {}),
     departTime: dep ? dep[1].replace(/\s+/g, " ") : null,
     departDate: dep ? dep[2].trim() : null,
     arriveTime: arr ? arr[1].replace(/\s+/g, " ") : null,
@@ -298,6 +325,13 @@ export async function searchFlights({
   }));
 
   const markup = hasResultMarkup(html);
+  const unpriced = unpricedCards(html);
+  if (unpriced.length) {
+    warnings.push(
+      `${unpriced.length} itinerar${unpriced.length > 1 ? "ies were" : "y was"} listed with "Price unavailable" ` +
+        `and left out of the ranking: ${unpriced.join("; ")}. Check those in a browser if they matter.`,
+    );
+  }
   if (!flights.length) {
     if (!markup) {
       warnings.push(
@@ -327,6 +361,7 @@ export async function searchFlights({
     attempts,
     pageHadResultMarkup: markup,
     count: flights.length,
+    unpriced,
     flights,
   };
   return { payload, warnings };
@@ -343,7 +378,8 @@ export function describe(f) {
     ? f.layovers.map((l) => `${hhmm(l.minutes)} at ${l.airport}`).join("; ")
     : "none";
   return (
-    `${f.currency} ${f.price.toLocaleString("en-US")} | ${f.airlines.join(" + ")} | ` +
+    `${f.currency} ${f.price.toLocaleString("en-US")} | ${f.airlines.join(" + ")}` +
+    `${f.alsoListed?.length ? ` (${f.alsoListed.join(", ")})` : ""} | ` +
     `${f.departTime} -> ${f.arriveTime} (${f.arriveDate}) | ${f.durationLabel} | ` +
     `${f.stops === 0 ? "nonstop" : `${f.stops} stop${f.stops > 1 ? "s" : ""}`} | ` +
     `layover: ${lay} | ${f.co2Kg} kg CO2e`
