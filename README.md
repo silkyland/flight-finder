@@ -5,6 +5,8 @@ Scrape Google Flights for a route, then let **Jev** pick the itinerary worth boo
 ```
 ./find.sh CNX NRT 2026-10-15 10        # 10 nights
 ./find.sh HKT SIN 2026-11-03 4 SGD     # 4 nights, priced in SGD
+./scan.sh --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 --nights 4
+./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 --nights 4
 ```
 
 Origin, destination, date, trip length and currency are all arguments — nothing is
@@ -193,6 +195,45 @@ that can run bash, with no MCP registration at all — but the itinerary list th
 agent's context, so Jev's token saving is lost. The judgment is identical; only the economics
 change. That is why the skill leads with both routes instead of requiring the server.
 
+
+
+## Sweeping many destinations
+
+`find.sh` and `scan.sh` both need a destination. When the traveller has not chosen one —
+"somewhere cheap from here", "where can I go for a long weekend" — the question is not which
+itinerary but *which destination*, and `sweep.sh` answers that:
+
+```bash
+./sweep.sh --from CNX --to all --dates 2026-11-10,2026-12-08,2027-01-12 --nights 4
+./sweep.sh --from CNX --to sea --from-date 2026-11-01 --to-date 2027-02-28 --step 7 --nights 4
+```
+
+`--to` accepts group names (`sea`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix
+of both. Every destination is priced on the **same** departure dates at the same trip length, in
+one pass, which is the only reason the fares can be compared to each other — spread the
+destinations across different dates and the ranking measures the calendar, not the routes.
+
+Each row reports the cheapest date found, the fare, the fastest journey and the spread across the
+sampled dates. Jev then judges which destination is the best *trip*, with the same
+`has_good_option` gate as the other two front doors.
+
+**The cheapest destination is often cheap for a bad reason.** A 40-destination sweep from CNX put
+Guangzhou (THB 6,532), Taipei (THB 9,773) and Seoul (THB 10,546) near the top — and all three were
+after-midnight departures: 21:10→00:45, 00:25→04:55, 00:10→07:10. They were cheap because of the
+hour, not the route. Kuala Lumpur at THB 5,336 was cheaper *and* flew at 09:10→13:10, so nothing
+had to be traded. Always print the times next to the price.
+
+A season costs one search per destination per date, so `40 destinations × 18 dates` is 720
+requests. The CLI warns above 240 pairs. The practical shape is three stages: sweep wide to find
+the cheap cluster, sweep the shortlist across the season to find real dates, then `scan.sh` the
+winner with `--step 1` over one month to find the actual cheapest day.
+
+Note that `--step 7` also pins the **weekday** — a seven-day step samples the same day of the week
+across the whole range, so "cheapest date" means "cheapest Sunday" unless `--from-date` says
+otherwise. Check the weekday before quoting a date, and always deepen a winner with `--step 1`
+before putting a number in front of someone.
+
+`sweep.sh` is CLI-only for now; the MCP server exposes the other two front doors.
 
 
 ## The questions

@@ -3,11 +3,13 @@ name: flight-finder
 description: >-
   Find flights and pick the best one by scraping Google Flights without a browser and having Jev
   judge the itineraries. Use for finding flights between two airports, comparing fares, deciding
-  which ticket to book, checking whether a quoted price is good, and finding the cheapest travel
-  dates across a season. Triggers include "find flights", "cheapest flight to X", "best ticket",
-  "which date is cheapest", "is this a good price", and the Thai forms "หา flight", "หาตั๋วเครื่องบิน",
-  "ตั๋วไป", "ราคาตั๋ว", "ช่วงไหนถูก". Works two ways: the flight-finder MCP tools (search_flights,
-  rank_flights, scan_dates) when the server is connected, otherwise the CLI in
+  which ticket to book, checking whether a quoted price is good, finding the cheapest travel
+  dates across a season, and working out which destination is cheapest when the traveller has not
+  chosen one yet. Triggers include "find flights", "cheapest flight to X", "best ticket",
+  "which date is cheapest", "is this a good price", "where can I fly cheaply from here",
+  "cheap getaway", and the Thai forms "หา flight", "หาตั๋วเครื่องบิน", "ตั๋วไป", "ราคาตั๋ว",
+  "ช่วงไหนถูก", "บินไปไหนดี", "ตั๋วถูก ๆ". Works two ways: the flight-finder MCP tools
+  (search_flights, rank_flights, scan_dates) when the server is connected, otherwise the CLI in
   ~/Sites/Onboards/flight-finder — see the CLI fallback section, and do not give up just because
   the MCP tools are missing.
 ---
@@ -15,11 +17,12 @@ description: >-
 # flight-finder
 
 Scrapes Google Flights from the initial HTML — no browser, no headless Chrome — then lets Jev
-pick between the itineraries. Answers two different questions, and mixing them up is the main
+pick between the alternatives. Answers three different questions, and mixing them up is the main
 way to get a bad answer:
 
 - **Which flight should I book on this date?** → `rank_flights`
 - **When is it cheap?** → `scan_dates`
+- **Which destination, when they have not picked one?** → `sweep.sh` (CLI only for now)
 
 ## Two ways to reach it — try the tools, fall back to the CLI
 
@@ -32,9 +35,11 @@ cd ~/Sites/Onboards/flight-finder
 ./find.sh CNX XIY 2026-12-11 4                                  # one date, judged
 ./scan.sh --from CNX --to XIY --from-date 2026-11-01 \
           --to-date 2027-02-28 --nights 4 --step 4              # a season, as a table
+./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 \
+           --nights 4                                           # many destinations, judged
 ```
 
-Both wrappers resolve `node` themselves, so they work even when the agent's PATH is minimal.
+All three wrappers resolve `node` themselves, so they work even when the agent's PATH is minimal.
 Requires only Node 20+ and a `use-jev` install; no build step. The one real cost of the CLI
 route is that the itinerary list lands in your context, so Jev's saving is lost — the *judgment*
 is the same, only the token economics differ. See the CLI fallback section at the end for flags.
@@ -89,6 +94,18 @@ Prices one route across many departure dates in a single pass. One row per date,
 Rows come back sorted by sweet-spot price. `step_days: 7` gives one sample per week, which is
 usually the right resolution for a season. Raise `max_dates` to cover more of the range.
 
+**`step_days` also locks the weekday.** A 7-day step lands on the same day of the week all the way
+across the range, so "the cheapest date" really means "the cheapest Tuesday" — or whatever weekday
+`from_date` happens to be. Check it before interpreting anything:
+
+```bash
+date -j -f %Y-%m-%d 2026-11-01 +%A      # macOS: 2026-11-01 = Sunday
+```
+
+When a date is actually going to be quoted, re-scan that winner with `step_days: 1` over a single
+month. A month is cheap to scan (28 searches) and it turns "cheapest Sunday" into "cheapest day" —
+worth doing before putting a number in front of a traveller.
+
 ### `search_flights` — the raw data
 
 ```
@@ -99,6 +116,33 @@ Every parsed itinerary for one date. Use it when the caller genuinely needs the 
 spreadsheet, a comparison table). **Do not use it as a first step to then decide yourself** — that
 is what `rank_flights` is for, and calling `search_flights` first and then reasoning over the
 result throws away the entire saving.
+
+### `sweep.sh` — which destination
+
+When the traveller has **not** named a destination ("somewhere cheap from here", "where can I fly
+for a weekend"), ranking itineraries is the wrong question. Sweep many destinations at once:
+
+```bash
+./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 --nights 4
+./sweep.sh --from CNX --to KUL,CAN,HAN,SIN --from-date 2026-11-01 --to-date 2027-02-28 \
+           --step 7 --nights 4
+```
+
+`--to` takes group names (`sea`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix.
+Every destination is priced on the **same** departure dates, so the fares are directly comparable —
+that is the whole point, and it is why the destinations must share one date list. A season costs
+one search per destination per date, so narrow `--to` or widen `--step`; the CLI warns above 240
+pairs. It reports, per destination, the cheapest date found, the fare, the fastest journey and the
+spread across sampled dates, then has Jev judge which destination is the best trip. Read `gate`
+first, exactly as with the other two.
+
+**The cheapest destination is often cheap for a bad reason.** In a 40-destination sweep from CNX,
+Guangzhou, Taipei and Seoul all ranked near the top — and all three were after-midnight departures
+(21:10→00:45, 00:25→04:55, 00:10→07:10). They were cheap because of the hour, not the route. Always
+report departure and arrival times beside the price, or the shortlist will mislead.
+
+The sweep is **CLI only** for now; there is no `sweep_destinations` MCP tool. Do not tell the
+traveller the capability does not exist — run `./sweep.sh`.
 
 ## Passing the traveller's preferences
 
@@ -185,6 +229,21 @@ anything escalated.
 **"Is THB 12,000 a good price for that?"** — this needs `scan_dates` for the surrounding weeks,
 not a single-date lookup. A price is only good or bad relative to the alternatives.
 
+**"I want a cheap trip abroad from Chiang Mai — low cost, but a good experience"**
+
+```
+./sweep.sh --from CNX --to all --dates 2026-11-10,2026-12-08,2027-01-12 --nights 4
+./sweep.sh --from CNX --to KUL,CAN,HAN,SIN,HKG,PVG --from-date 2026-11-01 \
+           --to-date 2027-02-28 --step 7 --nights 4          # then deepen the shortlist
+./scan.sh --from CNX --to KUL --from-date 2027-02-01 --to-date 2027-02-28 \
+          --nights 4 --step 1 --max 28                        # daily, on the winner only
+```
+
+Three stages, because one is not enough: sweep wide to find the cheap cluster, sweep the shortlist
+across a season to find real dates, then scan the winner **daily** to find the actual cheapest day.
+Report the fare next to the departure and arrival times, or the after-midnight options will look
+like the best deals. State the trip length you assumed, and say that baggage is not in the price.
+
 ## CLI fallback
 
 When the MCP server is not connected, the same logic runs from the repo:
@@ -199,7 +258,12 @@ PREFS="no overnight layovers" ./find.sh CNX XIY 2026-12-11 4
           --nights 4 --step 4 --max 32
 ./scan.sh --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 \
           --nights 4 --prefs "no overnight layovers; carry-on only"
+
+# many destinations at once, as a table
+./sweep.sh --from CNX --to all --dates 2026-11-10,2026-12-08 --nights 4
+./sweep.sh --from CNX --to sea --from-date 2026-11-01 --to-date 2027-02-28 --step 7 --nights 4
 ```
 
-Both resolve `node` themselves and exit 3 when a verdict escalated, so they can be used in
-scripts. See `README.md` in that directory for the parser details.
+All three resolve `node` themselves and exit 3 when a verdict escalated, so they can be used in
+scripts. Exit 3 is a *result*, not a failure — read the table, and check which verdict escalated.
+See `README.md` in that directory for the parser details.

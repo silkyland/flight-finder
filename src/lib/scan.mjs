@@ -30,7 +30,7 @@ export function dateRange(fromDate, toDate, stepDays = 7) {
 }
 
 /** Run `fn` over `items` with at most `limit` in flight at once, preserving input order. */
-async function mapLimit(items, limit, fn) {
+export async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let next = 0;
   const width = Math.min(Math.max(1, limit), items.length);
@@ -46,7 +46,7 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
-const median = (nums) => {
+export const median = (nums) => {
   if (!nums.length) return null;
   const s = [...nums].sort((a, b) => a - b);
   const m = s.length >> 1;
