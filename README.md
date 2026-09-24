@@ -13,15 +13,16 @@ Origin, destination, date, trip length and currency are all arguments — nothin
 hard-coded to a route. `CNX` / `NRT` in the examples are just placeholders. Nights comes
 before currency because you nearly always want it and rarely want the latter.
 
-Repository: <https://github.com/silkyland/flight-finder> (private)
+Repository: <https://github.com/silkyland/flight-finder> (MIT)
 
 ```bash
 git clone https://github.com/silkyland/flight-finder.git
 cd flight-finder && npm install
 ```
 
-Needs Node 20+ and a `use-jev` install. There is also an MCP server (`mcp/server.mjs`) and
-a skill (`skill/SKILL.md`) — see the two sections further down.
+Needs Node 20+ and a [`use-jev`](https://github.com/silkyland/use-jev) install. There is also an
+MCP server (`mcp/server.mjs`) and a skill (`skills/flight-finder/SKILL.md`) — see the two
+sections further down.
 
 
 ## Trip length is not optional
@@ -160,40 +161,55 @@ Two things worth knowing if you edit the parser:
 
 ## The skill
 
-`skill/SKILL.md`, symlinked into `~/.workbuddy-ai/skills/flight-finder` and
-`~/.agents/skills/flight-finder`, so it stays versioned with the code it describes. It
-carries the operational rules an agent needs and cannot infer: state the trip length, pass
-the traveller's own preferences verbatim, read the gate before the ranking, treat
-`escalate` as a prior, and never call an UNKNOWN date unavailable.
+`skills/flight-finder/SKILL.md`, so it stays versioned with the code it describes. It carries
+the operational rules an agent needs and cannot infer: state the trip length, pass the
+traveller's own preferences verbatim, read the gate before the ranking, treat `escalate` as a
+prior, and never call an UNKNOWN date unavailable.
 
-### Sharing it with other agents
+### Installing it into an agent
 
 There are **two independent layers**, and conflating them is the usual mistake:
 
-| Layer | Where it lives | Reaches other agents |
+| Layer | What it is | How it reaches an agent |
 | --- | --- | --- |
-| Skill | `~/.agents/skills/flight-finder` → this repo | only via a **per-agent symlink** |
-| MCP server | one config file **per agent**, in that agent's own format | only via a per-agent entry |
+| Skill | `skills/flight-finder/SKILL.md` in this repo | a **symlink** into the agent's skills directory |
+| MCP server | `mcp/server.mjs`, one process | an **entry in that agent's MCP config** |
 
-`~/.agents/skills/` is the shared library, but agents do not read it directly — each agent's
-skill directory holds an *individual* symlink per skill. So a new skill in `~/.agents/skills/`
-is invisible until you link it:
+The skill is a plain directory, so installing it is one symlink — or a copy, if the agent
+cannot follow links:
 
 ```bash
-ln -s ~/.agents/skills/flight-finder ~/.claude/skills/flight-finder
+git clone https://github.com/silkyland/flight-finder.git ~/flight-finder
+ln -s ~/flight-finder/skills/flight-finder ~/.<agent>/skills/flight-finder
 ```
 
-Linked into: claude, cursor, codex, devin, qwen, opencode, windsurf.
+Keep a single clone and symlink it everywhere. The skill documents the CLI that lives beside
+it, so a copy drifts the moment the code moves; set `FLIGHT_FINDER_DIR` to the clone and the
+commands work from any working directory.
 
-The MCP server is registered for **cursor** (`~/.cursor/mcp.json`), **codex**
-(`~/.codex/config.toml`) and **opencode** (`~/.config/opencode/opencode.json`). Each agent
-uses a different shape — opencode nests under `mcp` with `command` as an *array*, codex is
-TOML under `[mcp_servers.name]`, cursor and WorkBuddy use `mcpServers` with `command`/`args`.
+The MCP layer is one config file **per agent**, and every agent spells it differently. The
+common shape is `mcpServers` with `command` + `args`:
 
-**The MCP is optional.** The skill's CLI route (`./find.sh`, `./scan.sh`) works in any agent
-that can run bash, with no MCP registration at all — but the itinerary list then lands in the
-agent's context, so Jev's token saving is lost. The judgment is identical; only the economics
-change. That is why the skill leads with both routes instead of requiring the server.
+```json
+{
+  "mcpServers": {
+    "flight-finder": {
+      "command": "node",
+      "args": ["/absolute/path/to/flight-finder/mcp/server.mjs"]
+    }
+  }
+}
+```
+
+Use an **absolute path** for `server.mjs`, and a `node` that actually exists — agents often
+launch MCP servers with a minimal `PATH`, so a bare `node` that works in your shell can fail in
+theirs. `opencode` nests under `mcp` with `command` as an *array*; `codex` is TOML under
+`[mcp_servers.<name>]`. Both take the same two values.
+
+**The MCP is optional.** The skill's CLI route (`./find.sh`, `./scan.sh`, `./sweep.sh`) works in
+any agent that can run bash, with no MCP registration at all — but the itinerary list then lands
+in the agent's context, so Jev's token saving is lost. The judgment is identical; only the
+economics change. That is why the skill leads with both routes instead of requiring the server.
 
 
 

@@ -1,14 +1,36 @@
 {
   "name": "flight-finder",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
-  "description": "Scrape Google Flights and let Jev pick the best itinerary",
+  "description": "Scrape Google Flights without a browser, then let Jev judge the itineraries: which flight to book, which dates are cheapest, and which destination is worth the fare",
+  "license": "MIT",
+  "author": "Bundit Nuntates",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silkyland/flight-finder.git"
+  },
+  "homepage": "https://github.com/silkyland/flight-finder",
+  "keywords": [
+    "flights",
+    "google-flights",
+    "scraper",
+    "fare-comparison",
+    "mcp",
+    "model-context-protocol",
+    "jev",
+    "agent-skill"
+  ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "scrape": "node src/scrape.mjs",
-    "pick": "node src/pick.mjs"
+    "pick": "node src/pick.mjs",
+    "scan": "node src/scan.mjs",
+    "sweep": "node src/sweep.mjs",
+    "mcp": "node mcp/server.mjs",
+    "test": "node mcp/smoke.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0"

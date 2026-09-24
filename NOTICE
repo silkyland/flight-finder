@@ -1,0 +1,23 @@
+flight-finder
+Copyright (c) 2026 Bundit Nuntates — MIT (see LICENSE)
+
+The judgment layer — the noul / choice / score tools, the escalation contract,
+the action gate and the confidence thresholds — is provided by use-jev:
+
+    use-jev — https://github.com/silkyland/use-jev
+    Copyright (c) 2026 Bundit Nuntates — MIT License
+
+flight-finder is a client of that project, not a copy of it. The scraping,
+season-scanning and destination-sweeping code in this repository is
+independent, and use-jev runs equally well without it.
+
+TypeSafe, System One and Jev are products of TypeSafe AI
+(https://typesafe.ai). This project is an unaffiliated client.
+
+It reads the public no-JavaScript HTML that Google Flights serves to a plain
+HTTP request. Google Flights is a service of Google LLC; this project is not
+affiliated with, endorsed by or supported by Google. Fares and availability are
+Google's data, change constantly, and are shown here for comparison only — the
+price you pay is the one the airline quotes at booking.
+
+@modelcontextprotocol/sdk is used under the MIT License.

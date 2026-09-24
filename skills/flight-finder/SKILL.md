@@ -10,7 +10,7 @@ description: >-
   "cheap getaway", and the Thai forms "หา flight", "หาตั๋วเครื่องบิน", "ตั๋วไป", "ราคาตั๋ว",
   "ช่วงไหนถูก", "บินไปไหนดี", "ตั๋วถูก ๆ". Works two ways: the flight-finder MCP tools
   (search_flights, rank_flights, scan_dates) when the server is connected, otherwise the CLI in
-  ~/Sites/Onboards/flight-finder — see the CLI fallback section, and do not give up just because
+  a flight-finder checkout — see the CLI fallback section, and do not give up just because
   the MCP tools are missing.
 ---
 
@@ -31,7 +31,7 @@ shared across several agents and the MCP server is registered per agent, so it m
 missing — do not stop. The same logic runs from the repo:
 
 ```bash
-cd ~/Sites/Onboards/flight-finder
+cd "${FLIGHT_FINDER_DIR:-$HOME/flight-finder}"   # wherever the repo is cloned
 ./find.sh CNX XIY 2026-12-11 4                                  # one date, judged
 ./scan.sh --from CNX --to XIY --from-date 2026-11-01 \
           --to-date 2027-02-28 --nights 4 --step 4              # a season, as a table
@@ -319,10 +319,11 @@ like the best deals. State the trip length you assumed, and say that baggage is 
 
 ## CLI fallback
 
-When the MCP server is not connected, the same logic runs from the repo:
+When the MCP server is not connected, the same logic runs from the repo. Set
+`FLIGHT_FINDER_DIR` once to wherever you cloned it, or just `cd` there:
 
 ```bash
-cd ~/Sites/Onboards/flight-finder
+cd "${FLIGHT_FINDER_DIR:-$HOME/flight-finder}"
 ./find.sh CNX XIY 2026-12-11 4            # <ORIGIN> <DEST> <DATE> [NIGHTS] [CURRENCY]
 PREFS="no overnight layovers" ./find.sh CNX XIY 2026-12-11 4
 
