@@ -201,9 +201,27 @@ The scraped data is what Google Flights renders on the results page. It does **n
 - **Fare conditions** — refundability, change fees, seat selection
 - **Booking links** — the tool gives you flight numbers, not a checkout URL
 - **One-way searches** — round trips only, in practice
+- **Multi-city / open-jaw** — there is no way to price "fly into A, home from B", which is exactly
+  what a two-country trip wants. Price the legs as round trips and say plainly that the result is
+  an **upper bound**: a real open-jaw ticket is usually cheaper and saves a day of backtracking.
 
 If any of those decide the booking, say that the tool cannot answer it rather than implying the
 price is the whole story. Prices also move daily: treat a difference of a few percent as noise.
+
+## Two-country trips: price the hub, not the far end
+
+When the traveller wants two countries in one trip, do not price a round trip to the further one.
+Price a round trip to the **hub** plus a round trip on the short regional hop, and compare that
+against going direct.
+
+A real case: CNX → Istanbul + Tbilisi, 7 days. Istanbul round trip came to THB 30,205 and the
+nonstop Istanbul–Tbilisi hop to THB 8,174 — **THB 38,379 for both countries**. Flying to Tbilisi
+directly was THB 39,029 *and* 17h25 with two stops. So the two-country trip was cheaper than the
+one-country trip, because the far end is served only by long two-stop itineraries while the hub has
+a short single-stop one. The counter-intuitive result is the useful one; do not assume the extra
+country costs extra.
+
+Price the hop separately and add it up, rather than reasoning about what it "should" cost.
 
 ## Worked examples
 
