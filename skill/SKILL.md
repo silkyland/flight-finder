@@ -238,6 +238,22 @@ country costs extra.
 
 Price the hop separately and add it up, rather than reasoning about what it "should" cost.
 
+### The same rule catches the opposite trap: a short hop that costs more than the long-haul
+
+The rule cuts both ways. A short regional hop between two **non-hub** cities can be *dearer* than the
+long-haul the traveller already flew, because the only itinerary routes back through the hub.
+
+A real case: CNX → Udon Thani, THB 4,134 nonstop 1h05. The onward Udon Thani → Vientiane hop priced
+at **THB 9,474–10,080** — more than flying CNX → Vientiane directly at THB 9,070, for a distance a
+bus covers in an hour. There is no direct Udon–Vientiane flight; the itinerary is
+`FD3355 UTH-DMK` + wait + `FD1040 DMK-VTE`, i.e. it flies back north to Don Mueang first. Stacking
+the legs came to THB 13,608, roughly triple the land route. The layover was also **not constant**:
+1h30 on some dates and 9h40 on the cheapest ones.
+
+So: **never assume the shorter leg is the cheaper leg.** Whenever a trip is really "fly to a nearby
+city, then continue overland or onward", price that onward leg on its own before recommending it —
+and if it is a surface crossing rather than a flight, say plainly that the tool did not price it.
+
 ## A long layover is not automatically dead time
 
 Jev scores a 19-hour layover as time wasted, because that is what it is for a traveller who stays in
