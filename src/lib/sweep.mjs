@@ -26,7 +26,7 @@ import { summariseRow, mapLimit, median } from "./scan.mjs";
  * as the net it casts, so the net is deliberately wide and the caller can pass their own list.
  */
 export const GROUPS = {
-  sea: [
+  southeast: [
     ["KUL", "Kuala Lumpur", "Malaysia"],
     ["PEN", "Penang", "Malaysia"],
     ["BKI", "Kota Kinabalu", "Malaysia"],
@@ -76,7 +76,7 @@ export const GROUPS = {
   ],
 };
 
-GROUPS.all = [...GROUPS.sea, ...GROUPS.china, ...GROUPS.eastasia, ...GROUPS.southasia];
+GROUPS.all = [...GROUPS.southeast, ...GROUPS.china, ...GROUPS.eastasia, ...GROUPS.southasia];
 
 /**
  * Well-known codes that are not in any preset group, so a bare `--to TBS` still arrives at Jev as
@@ -127,6 +127,7 @@ const WORLD = [
   ["JFK", "New York", "United States"],
   ["LAX", "Los Angeles", "United States"],
   ["SFO", "San Francisco", "United States"],
+  ["SEA", "Seattle", "United States"],
   ["YVR", "Vancouver", "Canada"],
   ["SYD", "Sydney", "Australia"],
   ["MEL", "Melbourne", "Australia"],

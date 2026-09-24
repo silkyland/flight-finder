@@ -35,7 +35,7 @@ cd "${FLIGHT_FINDER_DIR:-$HOME/flight-finder}"   # wherever the repo is cloned
 ./find.sh CNX XIY 2026-12-11 4                                  # one date, judged
 ./scan.sh --from CNX --to XIY --from-date 2026-11-01 \
           --to-date 2027-02-28 --nights 4 --step 4              # a season, as a table
-./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 \
+./sweep.sh --from CNX --to southeast --dates 2026-11-10,2026-12-08 \
            --nights 4                                           # many destinations, judged
 ```
 
@@ -123,12 +123,12 @@ When the traveller has **not** named a destination ("somewhere cheap from here",
 for a weekend"), ranking itineraries is the wrong question. Sweep many destinations at once:
 
 ```bash
-./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 --nights 4
+./sweep.sh --from CNX --to southeast --dates 2026-11-10,2026-12-08 --nights 4
 ./sweep.sh --from CNX --to KUL,CAN,HAN,SIN --from-date 2026-11-01 --to-date 2027-02-28 \
            --step 7 --nights 4
 ```
 
-`--to` takes group names (`sea`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix.
+`--to` takes group names (`southeast`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix.
 Every destination is priced on the **same** departure dates, so the fares are directly comparable —
 that is the whole point, and it is why the destinations must share one date list. A season costs
 one search per destination per date, so narrow `--to` or widen `--step`; the CLI warns above 240
@@ -335,7 +335,7 @@ PREFS="no overnight layovers" ./find.sh CNX XIY 2026-12-11 4
 
 # many destinations at once, as a table
 ./sweep.sh --from CNX --to all --dates 2026-11-10,2026-12-08 --nights 4
-./sweep.sh --from CNX --to sea --from-date 2026-11-01 --to-date 2027-02-28 --step 7 --nights 4
+./sweep.sh --from CNX --to southeast --from-date 2026-11-01 --to-date 2027-02-28 --step 7 --nights 4
 ```
 
 All three resolve `node` themselves and exit 3 when a verdict escalated, so they can be used in

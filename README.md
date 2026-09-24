@@ -6,7 +6,7 @@ Scrape Google Flights for a route, then let **Jev** pick the itinerary worth boo
 ./find.sh CNX NRT 2026-10-15 10        # 10 nights
 ./find.sh HKT SIN 2026-11-03 4 SGD     # 4 nights, priced in SGD
 ./scan.sh --from CNX --to XIY --from-date 2026-11-01 --to-date 2027-02-28 --nights 4
-./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 --nights 4
+./sweep.sh --from CNX --to southeast --dates 2026-11-10,2026-12-08 --nights 4
 ```
 
 Origin, destination, date, trip length and currency are all arguments — nothing is
@@ -221,10 +221,10 @@ itinerary but *which destination*, and `sweep.sh` answers that:
 
 ```bash
 ./sweep.sh --from CNX --to all --dates 2026-11-10,2026-12-08,2027-01-12 --nights 4
-./sweep.sh --from CNX --to sea --from-date 2026-11-01 --to-date 2027-02-28 --step 7 --nights 4
+./sweep.sh --from CNX --to southeast --from-date 2026-11-01 --to-date 2027-02-28 --step 7 --nights 4
 ```
 
-`--to` accepts group names (`sea`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix
+`--to` accepts group names (`southeast`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix
 of both. A code outside the built-in index still works, it just arrives at Jev unnamed — which
 weakens the judgement, because the model reasons about places rather than about three-letter codes.
 Name it with `=`, never with a comma (a comma separates destinations):

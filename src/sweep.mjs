@@ -2,7 +2,7 @@
 /**
  * Price one origin against many destinations on the same departure dates and print the table.
  *
- *   node src/sweep.mjs --from CNX --to sea --dates 2026-11-10,2026-12-08 --nights 4
+ *   node src/sweep.mjs --from CNX --to southeast --dates 2026-11-10,2026-12-08 --nights 4
  *   node src/sweep.mjs --from CNX --to KUL,SIN,HKG --date 2026-11-10 --nights 4
  *
  * A trip length is required — see sweepDestinations() in src/lib/sweep.mjs for why.

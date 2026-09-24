@@ -2,7 +2,7 @@
 # Price one origin against many destinations on the same departure dates — the wrapper that
 # makes src/sweep.mjs runnable from any agent, without assuming node is on PATH.
 #
-#   ./sweep.sh --from CNX --to sea --dates 2026-11-10,2026-12-08 --nights 4
+#   ./sweep.sh --from CNX --to southeast --dates 2026-11-10,2026-12-08 --nights 4
 #   ./sweep.sh --from CNX --to KUL,SIN,HKG --date 2026-11-10 --nights 4 \
 #              --prefs "no overnight layovers; carry-on only"
 #
