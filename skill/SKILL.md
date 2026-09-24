@@ -66,6 +66,11 @@ Returns the winning itinerary, the close runners-up, a budget pick, a schedule p
 value, and a presence check. **Do not set `include_all`** unless the caller actually wants the
 whole list — the entire point is that the list stays out of your context.
 
+One itinerary often wins several of those categories at once, which is common on thin routes. When
+that happens the later slots come back as `{ id, probability, escalate, same_as: "pick" }` instead
+of repeating the full record — read `same_as` to find the slot that holds the detail. It is the
+same flight, not a missing one.
+
 ### `scan_dates` — when is it cheap
 
 ```

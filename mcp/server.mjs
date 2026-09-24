@@ -242,7 +242,18 @@ async function toolRank(args) {
   });
   const s = summarise(result, payload.flights);
 
-  const flight = (o) => (o ? { ...brief(o.flight), summary: describe(o.flight), probability: o.probability, escalate: o.escalate } : null);
+  // The same itinerary often wins several categories at once — cheapest AND fastest AND most
+  // civilised is common on thin routes. Sending its full record three times costs real tokens and
+  // carries no extra information, so send it once and reference it by id after that. This matters
+  // because keeping the list out of context is the entire reason Jev is here.
+  const full = new Map();
+  const flight = (o, slot) => {
+    if (!o) return null;
+    const head = { id: o.id, probability: o.probability, escalate: o.escalate };
+    if (full.has(o.id)) return { ...head, same_as: full.get(o.id) };
+    full.set(o.id, slot);
+    return { ...head, ...brief(o.flight), summary: describe(o.flight) };
+  };
 
   const out = {
     route: payload.route,
@@ -255,15 +266,15 @@ async function toolRank(args) {
     warnings,
     jev: { model: s.model, latency_ms: s.latencyMs, state_tokens: s.stateTokens, escalated: s.escalated },
     gate: s.gate,
-    pick: flight(s.pick),
+    pick: flight(s.pick, "pick"),
     runners_up: s.runnersUp.map((r) => ({
       id: r.id,
       probability: r.probability,
       summary: describe(r.flight),
     })),
-    best_budget: flight(s.best_budget),
-    best_schedule: flight(s.best_schedule),
-    worst_value: flight(s.worst_value),
+    best_budget: flight(s.best_budget, "best_budget"),
+    best_schedule: flight(s.best_schedule, "best_schedule"),
+    worst_value: flight(s.worst_value, "worst_value"),
     cheapest_value: s.cheapest_value,
     reading: s.escalated
       ? "At least one verdict escalated: treat the affected picks as priors, not decisions. The gate says whether a good option exists at all — read it before the ranking."
