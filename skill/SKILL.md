@@ -192,6 +192,21 @@ never assume a gap in the table means the season is covered. Always report `cove
 scan, and if a specific period matters (Chinese New Year, school holidays), say plainly whether
 that period actually got sampled.
 
+**Some routes return nothing on every date, and the fix is to change the origin.** A sweep of 20
+snow-relevant Chinese cities from CNX returned data for only **4**; the other 16 produced no
+markup on any sampled date, including cities that certainly have service (Changchun, Shenyang,
+Dalian, Urumqi, Zhangjiajie, Lijiang). Re-running the same destinations from **BKK** returned
+**7 of 12** — and 36 of 36 dates for Harbin. Bangkok simply has a far larger China network, so
+Google pre-renders those pages and does not pre-render the CNX ones.
+
+So when a whole *route* fails rather than a date, do not report the destination as unreachable and
+do not give up. Re-price it from the hub the traveller would realistically connect through
+(BKK, KUL, SIN, HKG), price the short hop from their real origin separately, and add the two up.
+Then say plainly that the total is a sum of two tickets, with the self-transfer risk that implies.
+
+You still cannot tell whether "no markup anywhere" means no service or no pre-render. Say which
+one you do not know rather than picking one.
+
 ## What this cannot tell you
 
 The scraped data is what Google Flights renders on the results page. It does **not** include:
