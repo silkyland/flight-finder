@@ -209,7 +209,15 @@ itinerary but *which destination*, and `sweep.sh` answers that:
 ```
 
 `--to` accepts group names (`sea`, `china`, `eastasia`, `southasia`, `all`), IATA codes, or a mix
-of both. Every destination is priced on the **same** departure dates at the same trip length, in
+of both. A code outside the built-in index still works, it just arrives at Jev unnamed — which
+weakens the judgement, because the model reasons about places rather than about three-letter codes.
+Name it with `=`, never with a comma (a comma separates destinations):
+
+```bash
+./sweep.sh --from CNX --to "TBS=Tbilisi=Georgia,EVN=Yerevan=Armenia" --dates 2026-11-10 --nights 6
+```
+
+Every destination is priced on the **same** departure dates at the same trip length, in
 one pass, which is the only reason the fares can be compared to each other — spread the
 destinations across different dates and the ranking measures the calendar, not the routes.
 

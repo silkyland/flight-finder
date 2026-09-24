@@ -78,11 +78,111 @@ export const GROUPS = {
 
 GROUPS.all = [...GROUPS.sea, ...GROUPS.china, ...GROUPS.eastasia, ...GROUPS.southasia];
 
-/** code -> {city, country}, so a bare `--to HAN` still gets named in the state Jev reads. */
-const INDEX = new Map();
-for (const [code, city, country] of GROUPS.all) INDEX.set(code, { city, country });
+/**
+ * Well-known codes that are not in any preset group, so a bare `--to TBS` still arrives at Jev as
+ * "Tbilisi, Georgia". That matters: the model reasons about places, not about three-letter codes,
+ * and a destination list of bare codes produces a much weaker judgement. Add to this freely — it is
+ * reference data, not logic, and an unknown code still works, it just goes in unnamed.
+ */
+const WORLD = [
+  ["IST", "Istanbul", "Turkey"],
+  ["SAW", "Istanbul (Sabiha Gokcen)", "Turkey"],
+  ["AYT", "Antalya", "Turkey"],
+  ["ADB", "Izmir", "Turkey"],
+  ["TBS", "Tbilisi", "Georgia"],
+  ["BUS", "Batumi", "Georgia"],
+  ["EVN", "Yerevan", "Armenia"],
+  ["GYD", "Baku", "Azerbaijan"],
+  ["TAS", "Tashkent", "Uzbekistan"],
+  ["ALA", "Almaty", "Kazakhstan"],
+  ["DXB", "Dubai", "United Arab Emirates"],
+  ["AUH", "Abu Dhabi", "United Arab Emirates"],
+  ["DOH", "Doha", "Qatar"],
+  ["RUH", "Riyadh", "Saudi Arabia"],
+  ["JED", "Jeddah", "Saudi Arabia"],
+  ["MCT", "Muscat", "Oman"],
+  ["KWI", "Kuwait City", "Kuwait"],
+  ["BAH", "Manama", "Bahrain"],
+  ["TLV", "Tel Aviv", "Israel"],
+  ["AMM", "Amman", "Jordan"],
+  ["CAI", "Cairo", "Egypt"],
+  ["LHR", "London", "United Kingdom"],
+  ["CDG", "Paris", "France"],
+  ["FRA", "Frankfurt", "Germany"],
+  ["MUC", "Munich", "Germany"],
+  ["AMS", "Amsterdam", "Netherlands"],
+  ["ZRH", "Zurich", "Switzerland"],
+  ["VIE", "Vienna", "Austria"],
+  ["FCO", "Rome", "Italy"],
+  ["MXP", "Milan", "Italy"],
+  ["MAD", "Madrid", "Spain"],
+  ["BCN", "Barcelona", "Spain"],
+  ["LIS", "Lisbon", "Portugal"],
+  ["ATH", "Athens", "Greece"],
+  ["PRG", "Prague", "Czechia"],
+  ["WAW", "Warsaw", "Poland"],
+  ["CPH", "Copenhagen", "Denmark"],
+  ["ARN", "Stockholm", "Sweden"],
+  ["HEL", "Helsinki", "Finland"],
+  ["JFK", "New York", "United States"],
+  ["LAX", "Los Angeles", "United States"],
+  ["SFO", "San Francisco", "United States"],
+  ["YVR", "Vancouver", "Canada"],
+  ["SYD", "Sydney", "Australia"],
+  ["MEL", "Melbourne", "Australia"],
+  ["AKL", "Auckland", "New Zealand"],
+  ["DEL", "Delhi", "India"],
+  ["BOM", "Mumbai", "India"],
+  ["BLR", "Bengaluru", "India"],
+  ["MAA", "Chennai", "India"],
+  ["NRT", "Tokyo", "Japan"],
+  ["HND", "Tokyo (Haneda)", "Japan"],
+  ["KIX", "Osaka", "Japan"],
+  ["FUK", "Fukuoka", "Japan"],
+  ["CTS", "Sapporo", "Japan"],
+  ["ICN", "Seoul", "South Korea"],
+  ["PUS", "Busan", "South Korea"],
+  ["PEK", "Beijing", "China"],
+  ["PVG", "Shanghai", "China"],
+  ["CAN", "Guangzhou", "China"],
+  ["SZX", "Shenzhen", "China"],
+  ["HKG", "Hong Kong", "China"],
+  ["MFM", "Macao", "China"],
+  ["TPE", "Taipei", "China"],
+  ["KHH", "Kaohsiung", "China"],
+  ["BKK", "Bangkok", "Thailand"],
+  ["DMK", "Bangkok (Don Mueang)", "Thailand"],
+  ["HKT", "Phuket", "Thailand"],
+  ["CNX", "Chiang Mai", "Thailand"],
+  ["REP", "Siem Reap", "Cambodia"],
+  ["PNH", "Phnom Penh", "Cambodia"],
+  ["RGN", "Yangon", "Myanmar"],
+  ["MDL", "Mandalay", "Myanmar"],
+  ["LPQ", "Luang Prabang", "Laos"],
+  ["VTE", "Vientiane", "Laos"],
+  ["KUL", "Kuala Lumpur", "Malaysia"],
+  ["PEN", "Penang", "Malaysia"],
+  ["BKI", "Kota Kinabalu", "Malaysia"],
+  ["SIN", "Singapore", "Singapore"],
+  ["HAN", "Hanoi", "Vietnam"],
+  ["SGN", "Ho Chi Minh City", "Vietnam"],
+  ["DAD", "Da Nang", "Vietnam"],
+  ["MNL", "Manila", "Philippines"],
+  ["DPS", "Denpasar (Bali)", "Indonesia"],
+  ["CMB", "Colombo", "Sri Lanka"],
+  ["MLE", "Male", "Maldives"],
+];
 
-/** Normalise `GROUPS` triples, `{code,city,country}` objects, or `"KUL,Kuala Lumpur,Malaysia"` / bare `"KUL"` strings. */
+/** code -> {city, country}, so a bare `--to TBS` still gets named in the state Jev reads. */
+const INDEX = new Map();
+for (const [code, city, country] of [...GROUPS.all, ...WORLD]) {
+  if (!INDEX.has(code)) INDEX.set(code, { city, country });
+}
+
+/**
+ * Normalise `GROUPS` triples, `{code,city,country}` objects, `"KUL=Kuala Lumpur=Malaysia"`, or a
+ * bare `"KUL"` string. The extra fields use `=` and not `,` because `,` separates destinations.
+ */
 export function normaliseDestinations(list) {
   return list.map((d) => {
     let code = null;
@@ -95,7 +195,7 @@ export function normaliseDestinations(list) {
     } else if (Array.isArray(d)) {
       [code, city = null, country = null] = d;
     } else {
-      const parts = String(d).split(",").map((s) => s.trim());
+      const parts = String(d).split("=").map((s) => s.trim());
       [code, city = null, country = null] = parts;
     }
     const upper = String(code).toUpperCase();

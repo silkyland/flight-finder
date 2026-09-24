@@ -61,7 +61,9 @@ if (args.help || !args.from || !args.to || !args.dates.length) {
        [--concurrency 3] [--tolerance 1.4] [--threshold 0.5] [--no-rank] [--out FILE]
 
   --to takes a comma list of group names (${groupNames})
-  or of IATA codes (KUL,SIN,HKG), or a mix of both, or "KUL,Kuala Lumpur,Malaysia".
+  or of IATA codes (KUL,SIN,HKG), or a mix of both. To name a code the built-in index does not
+  know, append the name with "=": KUL=Kuala Lumpur=Malaysia — never with a comma, which
+  separates destinations.
   Every destination is priced on the SAME departure dates, so the fares are comparable across
   destinations. A season costs one search per destination per date, so narrow --to or widen --step.
 
