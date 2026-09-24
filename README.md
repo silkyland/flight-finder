@@ -16,6 +16,13 @@ before currency because you nearly always want it and rarely want the latter.
 Repository: <https://github.com/silkyland/flight-finder> (MIT)
 
 ```bash
+npm install -g flight-finder        # or run one-off: npx -p flight-finder flight-finder-scan --help
+```
+
+That puts `flight-finder-mcp` (the MCP server), `flight-finder-scan`, `flight-finder-sweep`,
+`flight-finder-scrape` and `flight-finder-pick` on your PATH. To hack on it instead:
+
+```bash
 git clone https://github.com/silkyland/flight-finder.git
 cd flight-finder && npm install
 ```
