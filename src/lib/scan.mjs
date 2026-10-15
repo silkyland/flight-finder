@@ -17,8 +17,10 @@ import {
   nightsBetween,
   tripLabel,
   scoreOut,
+  verdictRanker,
   PREF_RULE,
 } from "./flights.mjs";
+import { blockGuard, emptyState, emptyCauseWarnings } from "./page-state.mjs";
 
 /** Every `stepDays`-th departure date in [fromDate, toDate], inclusive. */
 export function dateRange(fromDate, toDate, stepDays = 7) {
@@ -148,7 +150,8 @@ export async function scanDates({
   }
 
   const warnings = [];
-  let dates = dateRange(fromDate, toDate, stepDays);
+  const allDates = dateRange(fromDate, toDate, stepDays);
+  let dates = allDates;
   if (!dates.length) throw new Error("from_date/to_date produced no departure dates");
   if (dates.length > maxDates) {
     warnings.push(
@@ -158,8 +161,10 @@ export async function scanDates({
     dates = dates.slice(0, maxDates);
   }
 
+  const guard = blockGuard();
   const rows = await mapLimit(dates, concurrency, async (d) => {
     try {
+      guard.check();
       const { payload, warnings: w } = await searchFlights({
         from,
         to,
@@ -169,12 +174,13 @@ export async function scanDates({
         currency,
         timeoutMs,
       });
+      guard.note(payload);
       const row = summariseRow(payload, tolerance);
       row.searchedDates = payload.searchedDates;
       row.searchedNights = payload.searchedNights;
       // A date Google gave us no result markup for is UNKNOWN, not empty. Keep the two apart
       // all the way to the report, or a missing render reads as "this date is unavailable".
-      row.unknown = payload.count === 0 && !payload.pageHadResultMarkup;
+      Object.assign(row, emptyState(payload));
       if (payload.unpriced?.length) row.unpriced = payload.unpriced;
       if (w.length) row.warnings = w;
       return row;
@@ -196,12 +202,16 @@ export async function scanDates({
   for (const r of rows) {
     for (const w of r.warnings ?? []) {
       if (/Price unavailable/.test(w)) continue;
+      // Empty pages are summarised per cause below, across all dates.
+      if (/^Google returned a page with no itinerary markup/.test(w)) continue;
       if (!seen.has(w)) {
         seen.add(w);
         warnings.push(w);
       }
     }
   }
+  if (guard.blocked) warnings.push(`${guard.blocked}. Stopped fetching; try the scan again later.`);
+  warnings.push(...emptyCauseWarnings(rows, (r) => r.date));
   const failed = rows.filter((r) => r.error);
   if (failed.length) {
     warnings.push(`${failed.length} of ${rows.length} dates could not be priced: ${failed.map((r) => r.date).join(", ")}`);
@@ -215,7 +225,7 @@ export async function scanDates({
         "return data without checking them in a browser first.",
     );
   }
-  const empty = rows.filter((r) => !r.error && !r.count && !r.unknown);
+  const empty = rows.filter((r) => !r.error && !r.count && !r.unknown && !r.emptyCause);
   if (empty.length) {
     warnings.push(`itinerary markup was present but unparseable for: ${empty.map((r) => r.date).join(", ")}`);
   }
@@ -228,7 +238,7 @@ export async function scanDates({
       currency: String(currency).toUpperCase(),
       nights: nights == null ? nightsBetween(fromDate, returnDate) : Number(nights),
       stepDays: Math.max(1, Math.trunc(stepDays)),
-      datesRequested: dateRange(fromDate, toDate, stepDays).length,
+      datesRequested: allDates.length,
       datesPriced: rows.length,
       datesWithData: rows.filter((r) => r.count).length,
       datesUnknown: rows.filter((r) => r.unknown).length,
@@ -354,14 +364,7 @@ export async function rankDates(rows, meta, { preferences = [], threshold = null
 
 /** Turn a date-ranking verdict into the shape the MCP server reports. */
 export function summariseDates(result, rows) {
-  const byId = Object.fromEntries(result.verdicts.map((v) => [v.id, v]));
-  const rank = (id) => {
-    const v = byId[id];
-    if (v && v.type === "choice" && v.distribution) {
-      return Object.entries(v.distribution).sort((a, b) => b[1] - a[1]);
-    }
-    return [];
-  };
+  const { byId, rank } = verdictRanker(result);
   const rowOf = (date) => rows.find((r) => r.date === date) ?? null;
   const entry = (date, probability, escalate) => {
     const r = rowOf(date);

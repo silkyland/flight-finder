@@ -206,6 +206,7 @@ async function toolSearch(args) {
     currency: payload.currency,
     count: payload.count,
     searched_dates: payload.searchedDates,
+    empty_page: payload.emptyPage ?? undefined,
     warnings,
     itineraries: payload.flights.map((f) => ({
       ...brief(f),
@@ -231,6 +232,7 @@ async function toolRank(args) {
       date: payload.date,
       trip: tripLabel(payload),
       count: 0,
+      empty_page: payload.emptyPage ?? undefined,
       warnings,
       note: "Nothing was parsed, so there was nothing to judge. Read the warnings before concluding the route is unserved.",
     };
@@ -326,6 +328,7 @@ async function toolScan(args) {
       return_date: r.returnDate,
       itineraries: r.count,
       unknown: r.unknown || undefined,
+      empty_cause: r.emptyCause ?? undefined,
       // The sweet spot carries full detail because it is the one being recommended; the other
       // two are reference points, so they stay small or the row triples in size for no gain.
       sweet_spot: r.sweet_spot,

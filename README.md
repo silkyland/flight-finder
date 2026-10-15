@@ -16,13 +16,21 @@ before currency because you nearly always want it and rarely want the latter.
 Repository: <https://github.com/silkyland/flight-finder> (MIT)
 
 ```bash
+npm install -g flight-finder        # or run one-off: npx -p flight-finder flight-finder-scan --help
+```
+
+That puts `flight-finder-mcp` (the MCP server), `flight-finder-scan`, `flight-finder-sweep`,
+`flight-finder-scrape` and `flight-finder-pick` on your PATH. To hack on it instead:
+
+```bash
 git clone https://github.com/silkyland/flight-finder.git
 cd flight-finder && npm install
 ```
 
-Needs Node 20+ and a [`use-jev`](https://github.com/silkyland/use-jev) install. There is also an
-MCP server (`mcp/server.mjs`) and a skill (`skills/flight-finder/SKILL.md`) — see the two
-sections further down.
+Needs Node 20+. The ranking steps (`pick`, `rank_flights`, and scan/sweep without `--no-rank`)
+also need a [`use-jev`](https://github.com/silkyland/use-jev) install; scraping and price tables do
+not. There is also an MCP server (`mcp/server.mjs`) and a skill
+(`skills/flight-finder/SKILL.md`) — see the two sections further down.
 
 
 ## Trip length is not optional
@@ -81,6 +89,7 @@ travel through the context twice; this way it travels through zero times.
 ```
 src/lib/flights.mjs   the whole implementation — parsing, state, questions, jev, summary
 src/lib/scan.mjs      multi-date pricing, and judging which DATE is worth booking
+src/lib/page-state.mjs  why an empty page is empty (blocked, typo, deferred, ...)
 
 src/scrape.mjs        CLI wrapper:  Google Flights HTML  ->  out/<route>-<date>.json
 src/pick.mjs          CLI wrapper:  that JSON  ->  use-jev judge  ->  the pick
@@ -134,6 +143,26 @@ phrasing and one-way all return the same nothing).
 So a zero is reported as **UNKNOWN**, never as "no flights". The two are different claims
 and conflating them is how you tell someone a route does not exist. Coverage is genuinely
 patchy: a CNX→XIY scan of 8 sampled dates returned data for 5.
+
+Not every empty page is that, though. `src/lib/page-state.mjs` names the cause
+(`payload.emptyPage`):
+
+| cause | how it is recognised | effect |
+| --- | --- | --- |
+| `deferred` | title `"<A> to <B> \| Google Flights"`, both codes in the airport fields | UNKNOWN, retried |
+| `not_understood` | the generic landing title and an empty `Where to?` field (e.g. a typo'd code) | not UNKNOWN, no retry |
+| `blocked` | HTTP 429/403, a `/sorry/` redirect, "unusual traffic" in the visible text | no retry; a scan or sweep stops fetching |
+| `consent` | a `consent.google.*` redirect | no retry |
+| `unrecognised` | none of the above | UNKNOWN, retried |
+
+These are fixed markers, because the pages are templates. What they cannot separate, nothing
+can: a deferred page and a route with no flights are the same bytes, down to the scripts. So
+there is deliberately no `no_flights` marker.
+
+Jev comes in only for an `unrecognised` page, reading its visible text as a second opinion
+(it can also name `google_error`). It is optional: without a `use-jev` install, or with
+`FLIGHT_FINDER_NO_JEV=1`, the cause simply stays `unrecognised`. `emptyPage.source` records
+whether markers or Jev decided.
 
 ### Scraping without a browser
 

@@ -16,7 +16,8 @@
  * A destination that is absent has not been priced, which is not the same as being expensive.
  */
 
-import { searchFlights, runJev, scoreOut, PREF_RULE } from "./flights.mjs";
+import { searchFlights, runJev, scoreOut, verdictRanker, PREF_RULE } from "./flights.mjs";
+import { blockGuard, emptyState, emptyCauseWarnings } from "./page-state.mjs";
 import { summariseRow, mapLimit, median } from "./scan.mjs";
 /* ------------------------------------------------------------------ candidate sets */
 
@@ -268,8 +269,10 @@ export async function sweepDestinations({
   const pairs = [];
   for (const d of dests) for (const date of departures) pairs.push({ d, date });
 
+  const guard = blockGuard();
   const pairRows = await mapLimit(pairs, concurrency, async ({ d, date }) => {
     try {
+      guard.check();
       const { payload } = await searchFlights({
         from: FROM,
         to: d.code,
@@ -279,8 +282,9 @@ export async function sweepDestinations({
         currency,
         timeoutMs,
       });
+      guard.note(payload);
       const row = summariseRow(payload, tolerance);
-      row.unknown = payload.count === 0 && !payload.pageHadResultMarkup;
+      Object.assign(row, emptyState(payload));
       return { to: d.code, ...row };
     } catch (e) {
       return { to: d.code, date, count: 0, error: e.message };
@@ -306,6 +310,7 @@ export async function sweepDestinations({
         returnDate: r.returnDate,
         count: r.count,
         unknown: r.unknown ?? false,
+        emptyCause: r.emptyCause ?? null,
         error: r.error ?? null,
         cheapest: r.cheapest ?? null,
         sweet_spot: r.sweet_spot ?? null,
@@ -328,6 +333,8 @@ export async function sweepDestinations({
   });
 
   const warnings = [];
+  if (guard.blocked) warnings.push(`${guard.blocked}. Stopped fetching; try the sweep again later.`);
+  warnings.push(...emptyCauseWarnings(pairRows, (r) => `${FROM}-${r.to}`));
   const unknown = rows.filter((r) => r.unknown);
   if (unknown.length) {
     warnings.push(
@@ -502,14 +509,7 @@ export async function rankDestinations(rows, meta, { preferences = [], threshold
 
 /** Turn a destination-ranking verdict into the shape the CLI and MCP server report. */
 export function summariseSweep(result, rows) {
-  const byId = Object.fromEntries(result.verdicts.map((v) => [v.id, v]));
-  const rank = (id) => {
-    const v = byId[id];
-    if (v && v.type === "choice" && v.distribution) {
-      return Object.entries(v.distribution).sort((a, b) => b[1] - a[1]);
-    }
-    return [];
-  };
+  const { byId, rank } = verdictRanker(result);
   const rowOf = (code) => rows.find((r) => r.to === code) ?? null;
   const entry = (code, probability, escalate) => {
     const r = rowOf(code);
