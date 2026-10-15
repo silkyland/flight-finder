@@ -47,7 +47,8 @@
     "scan": "node src/scan.mjs",
     "sweep": "node src/sweep.mjs",
     "mcp": "node mcp/server.mjs",
-    "test": "node mcp/smoke.mjs"
+    "test": "node mcp/smoke.mjs",
+    "test:unit": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0"

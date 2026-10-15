@@ -40,7 +40,8 @@ cd "${FLIGHT_FINDER_DIR:-$HOME/flight-finder}"   # wherever the repo is cloned
 ```
 
 All three wrappers resolve `node` themselves, so they work even when the agent's PATH is minimal.
-Requires only Node 20+ and a `use-jev` install; no build step. The one real cost of the CLI
+Requires only Node 20+, plus a `use-jev` install for the ranking steps (scraping and
+`--no-rank` price tables run without it); no build step. The one real cost of the CLI
 route is that the itinerary list lands in your context, so Jev's saving is lost — the *judgment*
 is the same, only the token economics differ. See the CLI fallback section at the end for flags.
 
@@ -185,6 +186,21 @@ then reports the date as **UNKNOWN** (`unknown: true`, listed in `unknown_dates`
 
 Never describe an UNKNOWN date as "no flights", "sold out", or "expensive". It is unknown. Say so
 and, if it matters, suggest checking that date in a browser.
+
+Every empty page also carries a cause (`empty_page.cause` on one date, `empty_cause` per scan row).
+Read it before deciding what to do next:
+
+| cause | means | do |
+| --- | --- | --- |
+| `deferred` | route resolved, results left to JavaScript | UNKNOWN — the rules above |
+| `not_understood` | Google did not resolve the airports | fix the codes; this is not UNKNOWN |
+| `blocked` | rate-limited (429, `/sorry/`, captcha) | stop, retry later; the run skips the remaining dates |
+| `consent` | a consent wall instead of the search | check in a browser |
+| `google_error`, `unrecognised` | an error page, or a page shape nobody knows | UNKNOWN; mention it if it repeats |
+
+Causes come from fixed markers. Jev is asked only about an `unrecognised` page, and only when it is
+installed (`source` says who decided). No cause means "no flights": a `deferred` page and an
+unserved route are byte-for-byte the same page.
 
 Coverage is genuinely patchy, and it is not uniform: a full CNX→XIY winter scan returned data
 for **18 of 30** sampled dates, but only **2 of 10** in February. Whole weeks can go missing, so

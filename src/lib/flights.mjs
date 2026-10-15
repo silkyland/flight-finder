@@ -10,9 +10,11 @@
  */
 
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
+
+import { diagnoseEmptyPage } from "./page-state.mjs";
 
 export const GOOGLE = "https://www.google.com/travel/flights";
 
@@ -45,11 +47,19 @@ function decode(s) {
     .replace(/&quot;/g, '"')
     .replace(/&nbsp;/g, " ")
     .replace(/&ndash;/g, "-")
-    .replace(/&minus;/g, "-");
+    .replace(/&minus;/g, "-")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
 }
 
 const toText = (frag) =>
   decode(frag.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** The page as a reader sees it: no scripts, no styles, no tags. */
+export const pageText = (html) =>
+  decode(html.replace(/<(script|style)[\s\S]*?<\/\1>/g, " ").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 
@@ -82,8 +92,10 @@ const CURRENCY_CODES = {
 const CARD_RE = /Leaves [^<]{40,700}?Select flight/;
 
 /** Split the page into one chunk per itinerary. */
-function splitCards(html) {
-  return html.split(/(?=<li\b)/).filter((c) => PRICE_RE.test(c) && CARD_RE.test(c));
+const splitChunks = (html) => html.split(/(?=<li\b)/);
+
+function splitCards(chunks) {
+  return chunks.filter((c) => PRICE_RE.test(c) && CARD_RE.test(c));
 }
 
 /**
@@ -91,9 +103,9 @@ function splitCards(html) {
  * but dropping them silently hides that the route has more service than the list shows —
  * on BKK-MLE they were Singapore Airlines and China Eastern. Return a one-line label for each.
  */
-function unpricedCards(html) {
+function unpricedCards(chunks) {
   const labels = new Set();
-  for (const c of html.split(/(?=<li\b)/)) {
+  for (const c of chunks) {
     if (PRICE_RE.test(c) || !CARD_RE.test(c) || !/Price unavailable/.test(c)) continue;
     const air = c.match(/<div class="[^"]*"><span>([^<]+)<\/span>/);
     const dep = c.match(/Leaves .*? at (\d{1,2}:\d{2}\s*[AP]M)/);
@@ -215,11 +227,30 @@ const sig = (f) =>
  * result list it expects JavaScript to fill in". Both parse to zero itineraries, but only one
  * of them is a fact about the route — and the two must never be reported the same way.
  */
+/** Parse, de-duplicate and number every priced itinerary found in the page's chunks. */
+export function parseFlights(chunks, from, to, currency) {
+  const seen = new Map();
+  for (const c of splitCards(chunks)) {
+    const f = parseCard(c, from, to, currency);
+    if (!f) continue;
+    const k = sig(f);
+    if (!seen.has(k)) seen.set(k, f);
+  }
+  return [...seen.values()].map((f, i) => ({ ...f, id: `f${String(i + 1).padStart(2, "0")}` }));
+}
+
+export { splitChunks, fieldDates };
+
 const hasResultMarkup = (html) => /Select flight/.test(html) || /itinerary=/.test(html);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Fetch one Google Flights page, with the timeout applied to the request itself. */
+/**
+ * Fetch one Google Flights page, with the timeout applied to the request itself.
+ *
+ * A 429 or 403 is returned rather than thrown: it is a page state worth naming ("blocked"),
+ * and naming it is what lets a scan stop instead of hammering on.
+ */
 async function fetchPage(url, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -232,8 +263,10 @@ async function fetchPage(url, timeoutMs) {
         Accept: "text/html,application/xhtml+xml",
       },
     });
-    if (!res.ok) throw new Error(`Google Flights returned HTTP ${res.status}`);
-    return await res.text();
+    if (!res.ok && res.status !== 429 && res.status !== 403) {
+      throw new Error(`Google Flights returned HTTP ${res.status}`);
+    }
+    return { html: await res.text(), status: res.status, finalUrl: res.url };
   } finally {
     clearTimeout(timer);
   }
@@ -257,6 +290,7 @@ export async function searchFlights({
   returnDate = null,
   currency = "THB",
   timeoutMs = 45000,
+  useJev = true,
 } = {}) {
   const warnings = [];
   const FROM = String(from || "").toUpperCase();
@@ -281,16 +315,22 @@ export async function searchFlights({
   const url = `${GOOGLE}?q=${encodeURIComponent(query)}&hl=en&curr=${CURRENCY}`;
 
   // Google pre-renders the result list into the HTML only sometimes; when it does not, the
-  // page parses to zero itineraries even though the route is served. Retry before believing it.
-  let html = "";
+  // page parses to zero itineraries even though the route is served. Retry before believing it
+  // — but not when the page is a block, a consent wall or an unresolved route, where the next
+  // attempt gets the same page (or, for a block, a longer one).
+  let page = { html: "", status: 0, finalUrl: url };
+  let emptyPage = null;
   let attempts = 0;
   const maxAttempts = 3;
   while (attempts < maxAttempts) {
     attempts += 1;
-    html = await fetchPage(url, timeoutMs);
-    if (hasResultMarkup(html)) break;
+    page = await fetchPage(url, timeoutMs);
+    if (hasResultMarkup(page.html)) break;
+    const quick = await diagnoseEmptyPage({ ...page, from: FROM, to: TO }, { useJev: false });
+    if (!quick.retryable) break;
     if (attempts < maxAttempts) await sleep(700 * attempts);
   }
+  const { html } = page;
 
   const actual = fieldDates(html);
   if (!actual.return) {
@@ -314,18 +354,11 @@ export async function searchFlights({
     );
   }
 
-  const seen = new Map();
-  for (const f of splitCards(html).map((c) => parseCard(c, FROM, TO, CURRENCY)).filter(Boolean)) {
-    const k = sig(f);
-    if (!seen.has(k)) seen.set(k, f);
-  }
-  const flights = [...seen.values()].map((f, i) => ({
-    ...f,
-    id: `f${String(i + 1).padStart(2, "0")}`,
-  }));
+  const chunks = splitChunks(html);
+  const flights = parseFlights(chunks, FROM, TO, CURRENCY);
 
   const markup = hasResultMarkup(html);
-  const unpriced = unpricedCards(html);
+  const unpriced = unpricedCards(chunks);
   if (unpriced.length) {
     warnings.push(
       `${unpriced.length} itinerar${unpriced.length > 1 ? "ies were" : "y was"} listed with "Price unavailable" ` +
@@ -334,11 +367,14 @@ export async function searchFlights({
   }
   if (!flights.length) {
     if (!markup) {
+      // Jev is asked only here, once per empty page, and only for a page no marker recognises.
+      emptyPage = await diagnoseEmptyPage({ ...page, from: FROM, to: TO }, { useJev });
+      // An unresolved search is the bare landing form: its date fields are blank, so the
+      // trip-length warnings above ("ONE-WAY search") describe a search that never happened.
+      if (emptyPage.cause === "not_understood") warnings.length = 0;
       warnings.push(
         `Google returned a page with no itinerary markup at all (after ${attempts} attempt${attempts > 1 ? "s" : ""}). ` +
-          "This is NOT evidence the route has no flights: the no-JavaScript view is partial and " +
-          "Google sometimes defers the whole result list to JavaScript. Treat this date as UNKNOWN, " +
-          "not as unavailable, and confirm it in a browser before concluding anything.",
+          `Cause: ${emptyPage.cause} — ${emptyPage.explanation} ${emptyPage.advice}`,
       );
     } else {
       warnings.push(
@@ -360,6 +396,7 @@ export async function searchFlights({
     source: url,
     attempts,
     pageHadResultMarkup: markup,
+    emptyPage,
     count: flights.length,
     unpriced,
     flights,
@@ -496,11 +533,24 @@ export function buildQuestions(payload, preferences = []) {
   };
 }
 
-/** Locate the jev CLI: a real install on PATH first, then the clone. */
+/** Locate the jev CLI: the clone first, then a real install on PATH. */
 export function jevBin() {
   const clone = join(homedir(), ".agents", "mcp", "use-jev", "cli.mjs");
   if (existsSync(clone)) return { cmd: process.execPath, pre: [clone] };
   return { cmd: "use-jev", pre: [] };
+}
+
+/**
+ * Is Jev installed here? Not everyone has it, and only the ranking steps require it.
+ * FLIGHT_FINDER_NO_JEV=1 switches off the optional uses (page diagnosis) on a machine that has it.
+ */
+export function jevAvailable() {
+  if (process.env.FLIGHT_FINDER_NO_JEV === "1") return false;
+  if (existsSync(join(homedir(), ".agents", "mcp", "use-jev", "cli.mjs"))) return true;
+  const exts = process.platform === "win32" ? ["", ".cmd", ".exe"] : [""];
+  return (process.env.PATH || "")
+    .split(delimiter)
+    .some((dir) => dir && exts.some((e) => existsSync(join(dir, `use-jev${e}`))));
 }
 
 /**
@@ -512,42 +562,59 @@ export function jevBin() {
  * exit 3 means something escalated. The verdicts are still on stdout and still worth
  * reading, so that is not treated as a failure.
  */
-export async function runJev(questions, state, threshold = null) {
-  const { writeFileSync, mkdtempSync } = await import("node:fs");
-  const { tmpdir } = await import("node:os");
-
+export async function runJev(questions, state, threshold = null, { timeoutMs = 0 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "ff-jev-"));
-  const qPath = join(dir, "questions.json");
-  const sPath = join(dir, "state.json");
-  writeFileSync(qPath, JSON.stringify(questions, null, 2));
-  writeFileSync(sPath, JSON.stringify(state, null, 2));
+  try {
+    const qPath = join(dir, "questions.json");
+    const sPath = join(dir, "state.json");
+    writeFileSync(qPath, JSON.stringify(questions));
+    writeFileSync(sPath, JSON.stringify(state));
 
-  const bin = jevBin();
-  return new Promise((resolve, reject) => {
-    execFile(
-      bin.cmd,
-      [...bin.pre, "judge", "--questions-file", qPath, "--state-file", sPath],
-      {
-        maxBuffer: 32 * 1024 * 1024,
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          ...(threshold != null ? { JEV_CONFIDENCE_THRESHOLD: String(threshold) } : {}),
+    const bin = jevBin();
+    return await new Promise((resolve, reject) => {
+      execFile(
+        bin.cmd,
+        [...bin.pre, "judge", "--questions-file", qPath, "--state-file", sPath],
+        {
+          maxBuffer: 32 * 1024 * 1024,
+          encoding: "utf8",
+          timeout: timeoutMs,
+          env: {
+            ...process.env,
+            ...(threshold != null ? { JEV_CONFIDENCE_THRESHOLD: String(threshold) } : {}),
+          },
         },
-      },
-      (err, stdout, stderrOut) => {
-        if (stdout && stdout.trim()) {
-          try {
-            resolve({ result: JSON.parse(stdout), stderr: stderrOut });
-          } catch (e) {
-            reject(new Error(`could not parse jev output: ${e.message}`));
+        (err, stdout, stderrOut) => {
+          if (stdout && stdout.trim()) {
+            try {
+              resolve({ result: JSON.parse(stdout), stderr: stderrOut });
+            } catch (e) {
+              reject(new Error(`could not parse jev output: ${e.message}`));
+            }
+            return;
           }
-          return;
-        }
-        reject(new Error(err ? `${err.message}\n${stderrOut || ""}` : "jev produced no output"));
-      },
-    );
-  });
+          reject(new Error(err ? `${err.message}\n${stderrOut || ""}` : "jev produced no output"));
+        },
+      );
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Index jev verdicts by id and give a `rank(id)` that returns a choice's distribution as
+ * [key, probability] pairs, most likely first. Shared by every summarise* function.
+ */
+export function verdictRanker(result) {
+  const byId = Object.fromEntries(result.verdicts.map((v) => [v.id, v]));
+  const rank = (id) => {
+    const v = byId[id];
+    return v && v.type === "choice" && v.distribution
+      ? Object.entries(v.distribution).sort((a, b) => b[1] - a[1])
+      : [];
+  };
+  return { byId, rank };
 }
 
 /** Rank the itineraries of one already-scraped payload. */
@@ -582,14 +649,7 @@ export function scoreOut(sv) {
 
 /** Turn a jev result into the shape both the CLI and the MCP server report. */
 export function summarise(result, flights) {
-  const byId = Object.fromEntries(result.verdicts.map((v) => [v.id, v]));
-  const rank = (id) => {
-    const v = byId[id];
-    if (v && v.type === "choice" && v.distribution) {
-      return Object.entries(v.distribution).sort((a, b) => b[1] - a[1]);
-    }
-    return [];
-  };
+  const { byId, rank } = verdictRanker(result);
   const flightOf = (id) => flights.find((f) => f.id === id) || null;
 
   const pickId = byId.best_overall?.answer ?? null;
